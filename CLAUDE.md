@@ -10,7 +10,7 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
 
 ## Stack and commands
 
-- The stack is a single Next.js 15 (App Router, `output: 'standalone'`, `src/` dir, `@/*` → `src/*`) + TypeScript + Tailwind CSS v4 app that serves both the pages and the `/api/*` routes. It uses Prisma 6 (`prisma-client-js`) with PostgreSQL 16 and zod 4. It's deployed as one container on Azure Container Apps, backed by Azure PostgreSQL Flexible Server.
+- The stack is a single Next.js 15 (App Router, `output: 'standalone'`, `src/` dir, `@/*` → `src/*`) + TypeScript + Tailwind CSS v4 app that serves both the pages and the `/api/*` routes. It uses Prisma 6 (`prisma-client-js`) with PostgreSQL 16 and zod 4. The plan is to run it as one container on Azure Container Apps, backed by Azure PostgreSQL Flexible Server; it is **not deployed yet** (PRD §11, roadmap step 6).
 - `npm run dev` / `build` / `start` / `lint`.
 - `npm run lint` runs **both** checks in order and stops at the first failure:
   - `lint:next` (`eslint`, ESLint 9 flat config `eslint.config.mjs`, Next rules)
@@ -28,7 +28,8 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
 - Full stack in containers:
   - `npm run local:up` (`docker compose up --build --detach --wait`) builds and starts db plus app, and returns once both are healthy. The app is on **http://127.0.0.1:3001**.
   - `npm run local:down` stops them and keeps the DB volume (add `-v` via `docker compose down -v` only to wipe data).
-  - `npm run local:logs` follows the app logs (last 100 lines, then streams; Ctrl+C to exit). Override the port with `APP_PORT`. Use `127.0.0.1`, not `localhost`, because on this machine `[::1]:3000` is held by a WSL service.
+  - `npm run local:logs` follows the app logs (last 100 lines, then streams; Ctrl+C to exit).
+  - Override the app port with `APP_PORT`. Use `127.0.0.1`, not `localhost`, because on this machine `[::1]:3000` is held by a WSL service.
 - E2E: `npm run test:e2e` (Playwright) runs against the compose app, so start the stack first. Run one test with `npx playwright test -g "<name>"`. Point `E2E_BASE_URL` at another target to test it instead. The first time on a machine, run `npx playwright install chromium`.
 
 ## CI (`.github/workflows/ci.yml`)
@@ -98,7 +99,7 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
 - **Client bundles:** don't import `validation.ts` or `src/lib/quiz/*` (values, not types) from client components, because that pulls zod or Prisma into the browser. Shared constants go in `src/lib/limits.ts`. Type-only imports such as `QuizResult` or `LeaderboardEntry` are fine.
 - **Quiz screen structure:** `QuizRunner.tsx` only renders. The logic is split across:
   - `quiz/quiz-state.ts`: a pure reducer with `canSelect`, `currentQuestion`, and `isLastQuestion`; unit-tested in `tests/unit/quiz-state.test.ts`. Add state transitions here, not as new `useState`s.
-  - `quiz/use-quiz-session.ts`: API calls, answer pacing, retries, and navigation. It reads the latest state through a ref and uses a synchronous `inFlight` guard against double taps.
+  - `quiz/use-quiz-session.ts`: API calls, answer pacing, retries, and navigation. `select` and `next` take current state through their `useCallback` dependencies, and only the `onFeedback` callback is read through `useLatest`. A synchronous `inFlight` ref guards against double taps that land before a re-render.
   - `use-sound-preference.ts` and `use-option-hotkeys.ts`.
 - **React rules beyond the default lint:** `eslint-config-next` 15 pins `eslint-plugin-react-hooks` 5.2, which has no `refs` or `set-state-in-effect` rules. v7 is installed separately under the npm alias `eslint-plugin-react-hooks-v7`, with its own config file, so it doesn't collide with Next's plugin of the same name. `npm run lint` (through `lint:hooks`) enforces it.
   - Never read or write `ref.current` during render. For "latest callback" refs, use `useLatest` (`src/lib/use-latest.ts`, updated in `useLayoutEffect`); swap it for `useEffectEvent` once on React 19.2+.

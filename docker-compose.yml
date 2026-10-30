@@ -1,0 +1,41 @@
+# 로컬 실행·통합 검증용 (PRD 10.3)
+#   docker compose up --build -d   → db + app (마이그레이션·시드 자동)
+#   docker compose up -d db        → 개발 서버(npm run dev)용 DB만
+# 호스트 포트: 5432/3000은 로컬(WSL 등)의 다른 서비스와 겹치는 경우가 많아 기본값을 5433/3001로 둔다.
+# 보안: 포트는 127.0.0.1(이 컴퓨터)에만 연다. 0.0.0.0으로 열면 같은 네트워크의 누구나
+#       개발용 비밀번호로 DB에 접속할 수 있다. 휴대폰 등으로 앱을 확인할 때만 APP_HOST=0.0.0.0.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: trivia
+      POSTGRES_PASSWORD: trivia
+      POSTGRES_DB: trivia
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trivia -d trivia"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://trivia:trivia@db:5432/trivia
+      RUN_SEED: "true"
+      # 앞단 프록시 수(요청 횟수 제한의 클라이언트 IP 판별). 로컬은 프록시가 없으므로 0, ACA에서는 1.
+      TRUSTED_PROXY_HOPS: "0"
+    ports: ["${APP_HOST:-127.0.0.1}:${APP_PORT:-3001}:3000"]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,101 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuizMode {
+  ALL
+  CATEGORY
+}
+
+model Category {
+  id        Int           @id @default(autoincrement())
+  slug      String        @unique
+  name      String
+  sortOrder Int           @default(0) @map("sort_order")
+  questions Question[]
+  sessions  QuizSession[]
+  scores    Score[]
+
+  @@map("categories")
+}
+
+model Question {
+  id          Int             @id @default(autoincrement())
+  categoryId  Int             @map("category_id")
+  category    Category        @relation(fields: [categoryId], references: [id])
+  question    String
+  options     String[]
+  answerIndex Int             @map("answer_index") @db.SmallInt
+  explanation String
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  answers     SessionAnswer[]
+
+  @@index([categoryId])
+  @@map("questions")
+}
+
+model QuizSession {
+  id          String          @id @default(uuid()) @db.Uuid
+  mode        QuizMode
+  categoryId  Int?            @map("category_id")
+  category    Category?       @relation(fields: [categoryId], references: [id])
+  questionIds Int[]           @map("question_ids")
+  startedAt   DateTime        @default(now()) @map("started_at") @db.Timestamptz
+  completedAt DateTime?       @map("completed_at") @db.Timestamptz
+  answers     SessionAnswer[]
+  score       Score?
+
+  // 오래된 미등록 세션 정리(cleanupExpiredSessions)용
+  @@index([startedAt])
+  // 세션이 참조하는 문제의 삭제를 막는 트리거(question_ids @> ARRAY[id])가 쓰는 인덱스
+  @@index([questionIds], type: Gin)
+  @@map("quiz_sessions")
+}
+
+model SessionAnswer {
+  sessionId     String      @map("session_id") @db.Uuid
+  session       QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId    Int         @map("question_id")
+  question      Question    @relation(fields: [questionId], references: [id])
+  selectedIndex Int         @map("selected_index") @db.SmallInt
+  isCorrect     Boolean     @map("is_correct")
+  answeredAt    DateTime    @default(now()) @map("answered_at") @db.Timestamptz
+
+  @@id([sessionId, questionId])
+  @@map("session_answers")
+}
+
+model Score {
+  id           Int         @id @default(autoincrement())
+  sessionId    String      @unique @map("session_id") @db.Uuid
+  session      QuizSession @relation(fields: [sessionId], references: [id])
+  username     String      @db.VarChar(12)
+  score        Int
+  maxScore     Int         @map("max_score")
+  correctCount Int         @map("correct_count")
+  totalCount   Int         @map("total_count")
+  mode         QuizMode
+  categoryId   Int?        @map("category_id")
+  category     Category?   @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([mode, categoryId, score(sort: Desc), createdAt])
+  @@map("scores")
+}
+
+/// IP별 요청 횟수 제한용 고정 윈도 카운터. 여러 replica가 같은 카운터를 공유하도록 DB에 둔다.
+model RateLimit {
+  key         String
+  windowStart DateTime @map("window_start") @db.Timestamptz
+  count       Int
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limits")
+}

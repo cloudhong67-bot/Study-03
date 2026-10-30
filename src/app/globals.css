@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f7fb;
+  --foreground: #1b1d29;
+  --surface: #ffffff;
+  --muted: #646a80;
+  --border: #e3e6ef;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f1117;
+    --foreground: #eceef5;
+    --surface: #181b24;
+    --muted: #9aa0b4;
+    --border: #2a2e3b;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕",
+    "Noto Sans KR", "Segoe UI", sans-serif;
+}
+
+/* 정/오답 연출 (motion-safe: 접두사로만 사용 → 동작 줄이기 설정을 존중) */
+@theme {
+  --animate-shake: shake 0.45s ease-in-out;
+  --animate-pop: pop 0.35s ease-out;
+  --animate-rise: rise 0.3s ease-out;
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}

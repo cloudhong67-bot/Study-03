@@ -1,0 +1,37 @@
+# 빌드 컨텍스트를 작게 유지하고, 로컬 산출물·비밀 값이 이미지에 섞이지 않게 한다.
+node_modules
+.next
+out
+build
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# 비밀 값 (.env.example 포함 전부 제외: 런타임 값은 compose/ACA 환경 변수로 주입)
+.env*
+
+# 테스트·리포트
+tests
+playwright-report
+test-results
+blob-report
+vitest.config.mts
+playwright.config.ts
+
+# 저장소·도구·문서
+.git
+.github
+.gitignore
+.gitattributes
+.claude
+.vscode
+.idea
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.md
+
+# OS/로그
+.DS_Store
+Thumbs.db
+npm-debug.log*

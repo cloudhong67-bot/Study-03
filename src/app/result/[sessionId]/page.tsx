@@ -19,6 +19,7 @@ function loadResult(sessionId: string) {
 export default async function ResultPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   const result = await loadResult(sessionId);
+  const target = { mode: result.mode, categorySlug: result.categorySlug };
 
   return (
     <div className="space-y-6">
@@ -37,15 +38,16 @@ export default async function ResultPage({ params }: { params: Promise<{ session
         <ScoreSubmitForm
           sessionId={sessionId}
           submitted={result.submitted}
+          mode={result.mode}
           categorySlug={result.categorySlug}
         />
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link href={quizHref(result.categorySlug)} className={result.completed ? secondaryButton : primaryButton}>
+        <Link href={quizHref(target)} className={result.completed ? secondaryButton : primaryButton}>
           🔄 다시 도전
         </Link>
-        <Link href={leaderboardHref({ categorySlug: result.categorySlug })} className={secondaryButton}>
+        <Link href={leaderboardHref(target)} className={secondaryButton}>
           🏆 순위 보기
         </Link>
       </div>

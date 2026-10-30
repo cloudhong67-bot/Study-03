@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { categoryIcon } from "@/components/category-icon";
+import { SPEED_QUESTION_COUNT, SPEED_TIME_LIMIT_MS } from "@/lib/limits";
 import { leaderboardHref, quizHref } from "@/lib/routes";
 
 interface MainMenuProps {
@@ -19,7 +20,14 @@ export function MainMenu({ categories, totalQuestions }: MainMenuProps) {
     <div className="space-y-3">
       <Link href={quizHref()} className={`${primaryButton} min-h-14 flex-col gap-0 py-2`}>
         <span>게임 시작</span>
-        <span className="text-xs font-normal opacity-80">전체 {totalQuestions}문제 연속 풀이</span>
+        <span className="text-xs font-normal opacity-80">전체 도전 · {totalQuestions}문제 연속 풀이</span>
+      </Link>
+
+      <Link href={quizHref({ mode: "SPEED" })} className={`${secondaryButton} min-h-14 flex-col gap-0 py-2`}>
+        <span>⚡ 스피드 퀴즈</span>
+        <span className="text-xs font-normal text-muted">
+          무작위 {Math.min(SPEED_QUESTION_COUNT, totalQuestions)}문제 · 문제당 {SPEED_TIME_LIMIT_MS / 1000}초
+        </span>
       </Link>
 
       <button
@@ -37,7 +45,7 @@ export function MainMenu({ categories, totalQuestions }: MainMenuProps) {
           {categories.map((c) => (
             <li key={c.slug}>
               <Link
-                href={quizHref(c.slug)}
+                href={quizHref({ categorySlug: c.slug })}
                 className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border bg-surface p-4 text-center transition hover:border-indigo-400 hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:hover:bg-indigo-950/40"
               >
                 <span aria-hidden className="text-3xl">

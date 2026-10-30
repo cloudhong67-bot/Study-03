@@ -11,6 +11,15 @@ datasource db {
 enum QuizMode {
   ALL
   CATEGORY
+  /// 전체에서 무작위 20문제, 문제당 15초 제한
+  SPEED
+}
+
+/// 기본 점수 배수: EASY 1배, MEDIUM 1.5배, HARD 2배 (src/lib/scoring.ts)
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
 }
 
 model Category {
@@ -26,29 +35,32 @@ model Category {
 }
 
 model Question {
-  id          Int             @id @default(autoincrement())
-  categoryId  Int             @map("category_id")
-  category    Category        @relation(fields: [categoryId], references: [id])
+  id          Int                   @id @default(autoincrement())
+  categoryId  Int                   @map("category_id")
+  category    Category              @relation(fields: [categoryId], references: [id])
   question    String
   options     String[]
-  answerIndex Int             @map("answer_index") @db.SmallInt
+  answerIndex Int                   @map("answer_index") @db.SmallInt
   explanation String
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  difficulty  Difficulty            @default(MEDIUM)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz
   answers     SessionAnswer[]
+  views       SessionQuestionView[]
 
   @@index([categoryId])
   @@map("questions")
 }
 
 model QuizSession {
-  id          String          @id @default(uuid()) @db.Uuid
+  id          String                @id @default(uuid()) @db.Uuid
   mode        QuizMode
-  categoryId  Int?            @map("category_id")
-  category    Category?       @relation(fields: [categoryId], references: [id])
-  questionIds Int[]           @map("question_ids")
-  startedAt   DateTime        @default(now()) @map("started_at") @db.Timestamptz
-  completedAt DateTime?       @map("completed_at") @db.Timestamptz
+  categoryId  Int?                  @map("category_id")
+  category    Category?             @relation(fields: [categoryId], references: [id])
+  questionIds Int[]                 @map("question_ids")
+  startedAt   DateTime              @default(now()) @map("started_at") @db.Timestamptz
+  completedAt DateTime?             @map("completed_at") @db.Timestamptz
   answers     SessionAnswer[]
+  views       SessionQuestionView[]
   score       Score?
 
   // 오래된 미등록 세션 정리(cleanupExpiredSessions)용
@@ -63,12 +75,32 @@ model SessionAnswer {
   session       QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   questionId    Int         @map("question_id")
   question      Question    @relation(fields: [questionId], references: [id])
-  selectedIndex Int         @map("selected_index") @db.SmallInt
+  /// null: 스피드 퀴즈에서 보기를 고르지 못하고 시간이 끝남
+  selectedIndex Int?        @map("selected_index") @db.SmallInt
   isCorrect     Boolean     @map("is_correct")
+  /// 문제를 연 시각(session_question_views)부터 답안이 도착할 때까지 서버가 잰 시간. 이전 버전의 답안은 null
+  elapsedMs     Int?        @map("elapsed_ms")
+  hintUsed      Boolean     @default(false) @map("hint_used")
+  /// 스피드 퀴즈 제한 시간을 넘김 (항상 오답)
+  timedOut      Boolean     @default(false) @map("timed_out")
   answeredAt    DateTime    @default(now()) @map("answered_at") @db.Timestamptz
 
   @@id([sessionId, questionId])
   @@map("session_answers")
+}
+
+/// 문제를 화면에 띄운 시각과 50:50 힌트 사용 기록. 시간 보너스·제한 시간을 서버 시계로 재기 위해 둔다.
+model SessionQuestionView {
+  sessionId   String      @map("session_id") @db.Uuid
+  session     QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId  Int         @map("question_id")
+  question    Question    @relation(fields: [questionId], references: [id])
+  viewedAt    DateTime    @map("viewed_at") @db.Timestamptz
+  /// 50:50 힌트로 지운 보기 2개. 비어 있으면 힌트를 쓰지 않았다
+  hintRemoved Int[]       @default([]) @map("hint_removed") @db.SmallInt
+
+  @@id([sessionId, questionId])
+  @@map("session_question_views")
 }
 
 model Score {

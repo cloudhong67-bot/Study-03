@@ -5,6 +5,7 @@ import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { flattenSearchParams, orNotFound, type SearchParams } from "@/lib/page-helpers";
 import { listCategories } from "@/lib/quiz/categories";
 import { getLeaderboard } from "@/lib/quiz/scores";
+import { SPEED_QUESTION_COUNT, SPEED_TIME_LIMIT_MS } from "@/lib/limits";
 import { leaderboardHref, quizHref } from "@/lib/routes";
 import { leaderboardQuerySchema, type LeaderboardQuery } from "@/lib/validation";
 
@@ -33,24 +34,40 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
   const [categories, entries] = await Promise.all([listCategories(), orNotFound(getLeaderboard(query))]);
 
   const activeSlug = query.category ?? null;
-  const activeName = categories.find((c) => c.slug === activeSlug)?.name ?? "전체";
+  const isSpeed = query.mode === "SPEED";
+  const activeCategory = categories.find((c) => c.slug === activeSlug);
+  const activeName = activeCategory?.name ?? (isSpeed ? "스피드" : "전체");
+  const totalQuestions = categories.reduce((sum, c) => sum + c.questionCount, 0);
+  const description = activeCategory
+    ? `${activeCategory.name} ${activeCategory.questionCount}문제`
+    : isSpeed
+      ? `스피드 ${Math.min(SPEED_QUESTION_COUNT, totalQuestions)}문제 · 문제당 ${SPEED_TIME_LIMIT_MS / 1000}초`
+      : `전체 ${totalQuestions}문제`;
+  const target = { mode: query.mode, categorySlug: activeSlug };
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-extrabold">🏆 순위표</h1>
         <p className="mt-1 text-sm text-muted">
-          {activeSlug ? `${activeName} 10문제 · 100점 만점` : "전체 40문제 · 400점 만점"} · 동점이면 먼저 기록한 순
+          {description} · 동점이면 먼저 기록한 순
         </p>
       </div>
 
       <nav aria-label="순위표 종류" className="flex flex-wrap gap-2">
         <Link
           href={leaderboardHref({ limit: query.limit })}
-          className={tabClass(!activeSlug)}
-          aria-current={!activeSlug ? "page" : undefined}
+          className={tabClass(query.mode === "ALL")}
+          aria-current={query.mode === "ALL" ? "page" : undefined}
         >
           전체
+        </Link>
+        <Link
+          href={leaderboardHref({ mode: "SPEED", limit: query.limit })}
+          className={tabClass(isSpeed)}
+          aria-current={isSpeed ? "page" : undefined}
+        >
+          ⚡ 스피드
         </Link>
         {categories.map((c) => (
           <Link
@@ -72,7 +89,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
           {[10, 50].map((limit) => (
             <Link
               key={limit}
-              href={leaderboardHref({ categorySlug: activeSlug, limit })}
+              href={leaderboardHref({ ...target, limit })}
               aria-current={query.limit === limit ? "page" : undefined}
               className={`rounded-full px-3 py-1.5 font-semibold ${
                 query.limit === limit ? "bg-indigo-600 text-white" : "text-muted"
@@ -87,8 +104,8 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
       <LeaderboardTable entries={entries} highlightRank={Number.isInteger(highlight) ? highlight : undefined} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link href={quizHref(activeSlug)} className={primaryButton}>
-          🔄 {activeSlug ? `${activeName} 재도전` : "재도전"}
+        <Link href={quizHref(target)} className={primaryButton}>
+          🔄 {query.mode === "ALL" ? "재도전" : `${activeName} 재도전`}
         </Link>
         <Link href="/" className={secondaryButton}>
           메인으로

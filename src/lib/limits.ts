@@ -10,3 +10,7 @@ export const USERNAME_MAX_LENGTH = 12;
  * 스크립트로 정답을 수집·제출하는 속도를 늦추기 위한 값이다.
  */
 export const MIN_ANSWER_INTERVAL_MS = 1000;
+
+/** 스피드 퀴즈: 전체 문제에서 무작위로 고르는 문제 수와 문제당 제한 시간 */
+export const SPEED_QUESTION_COUNT = 20;
+export const SPEED_TIME_LIMIT_MS = 15_000;

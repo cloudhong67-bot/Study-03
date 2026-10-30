@@ -6,20 +6,32 @@ import { GET as getCategories } from "@/app/api/categories/route";
 import { GET as getHealth } from "@/app/api/health/route";
 import { GET as getLeaderboard } from "@/app/api/leaderboard/route";
 import { POST as postAnswer } from "@/app/api/sessions/[id]/answers/route";
+import { POST as postHint } from "@/app/api/sessions/[id]/hints/route";
 import { GET as getResult } from "@/app/api/sessions/[id]/result/route";
 import { POST as postSubmit } from "@/app/api/sessions/[id]/submit/route";
+import { POST as postView } from "@/app/api/sessions/[id]/views/route";
 import { POST as postSession } from "@/app/api/sessions/route";
 import { MAX_JSON_BODY_BYTES } from "@/lib/api";
-import { MIN_ANSWER_INTERVAL_MS } from "@/lib/limits";
+import { MIN_ANSWER_INTERVAL_MS, SPEED_QUESTION_COUNT, SPEED_TIME_LIMIT_MS } from "@/lib/limits";
 import { createMaintenanceRunner, MAINTENANCE_INTERVAL_MS } from "@/lib/maintenance";
 import { prisma } from "@/lib/prisma";
-import { cleanupExpiredSessions, SESSION_TTL_MS } from "@/lib/quiz/sessions";
+import { cleanupExpiredSessions, SESSION_TTL_MS, SPEED_DEADLINE_GRACE_MS } from "@/lib/quiz/sessions";
 import { consumeRateLimit, pruneRateLimits, RATE_LIMITS } from "@/lib/rate-limit";
 
 const UNKNOWN_SESSION_ID = "00000000-0000-4000-8000-000000000000";
 
 type Body = Record<string, unknown> & { error?: { code: string; message: string } };
-type SessionQuestion = { id: number; category: string; question: string; options: string[] };
+type SessionQuestion = { id: number; category: string; difficulty: string; question: string; options: string[] };
+type Points = { base: number; time: number; hint: number; combo: number; total: number };
+type Feedback = {
+  isCorrect: boolean;
+  timedOut: boolean;
+  answerIndex: number;
+  explanation: string;
+  points: Points;
+  streak: number;
+  score: number;
+};
 type LeaderboardEntry = { rank: number; username: string; score: number; maxScore: number; created_at: string };
 
 /** clientIp를 주면 X-Forwarded-For로 보낸다 (요청 횟수 제한의 클라이언트 식별). */
@@ -37,10 +49,10 @@ async function read<T = Body>(response: Response) {
   return { status: response.status, body: (await response.json()) as T };
 }
 
+type CreatedSession = { sessionId: string; mode: string; timeLimitMs: number | null; questions: SessionQuestion[] };
+
 async function createSession(body: unknown) {
-  const { status, body: data } = await read<{ sessionId: string; questions: SessionQuestion[] }>(
-    await postSession(request("/api/sessions", body)),
-  );
+  const { status, body: data } = await read<CreatedSession>(await postSession(request("/api/sessions", body)));
   expect(status).toBe(201);
   return data;
 }
@@ -53,15 +65,31 @@ async function answerKey(ids: number[]) {
   return new Map(rows.map((r) => [r.id, r.answerIndex]));
 }
 
-/** 시계를 진행하지 않고 바로 답한다 (1초 간격 제한 검증용). */
-function answerNow(sessionId: string, questionId: number, selectedIndex: number) {
+/** 문제를 연다 (답안 시간 측정 시작). 이미 열었으면 처음 연 시각 그대로다. */
+function openQuestion(sessionId: string, questionId: unknown) {
+  return postView(request(`/api/sessions/${sessionId}/views`, { questionId }), ctx(sessionId));
+}
+
+function requestHint(sessionId: string, questionId: unknown) {
+  return postHint(request(`/api/sessions/${sessionId}/hints`, { questionId }), ctx(sessionId));
+}
+
+/** 문제를 열지 않고 답안만 보낸다. */
+function postAnswerOnly(sessionId: string, questionId: number, selectedIndex: number | null) {
   return postAnswer(request(`/api/sessions/${sessionId}/answers`, { questionId, selectedIndex }), ctx(sessionId));
 }
 
-/** 사람이 문제를 읽는 시간만큼 (가짜) 시계를 진행한 뒤 답한다. */
-function answer(sessionId: string, questionId: number, selectedIndex: number) {
+/** 문제를 열고 시계를 진행하지 않고 바로 답한다 (1초 간격 제한 검증용). */
+async function answerNow(sessionId: string, questionId: number, selectedIndex: number | null) {
+  await openQuestion(sessionId, questionId);
+  return postAnswerOnly(sessionId, questionId, selectedIndex);
+}
+
+/** 문제를 열고, 사람이 문제를 읽는 시간만큼 (가짜) 시계를 진행한 뒤 답한다 (시간 보너스를 받는 빠르기). */
+async function answer(sessionId: string, questionId: number, selectedIndex: number | null) {
+  await openQuestion(sessionId, questionId);
   advanceClock(MIN_ANSWER_INTERVAL_MS);
-  return answerNow(sessionId, questionId, selectedIndex);
+  return postAnswerOnly(sessionId, questionId, selectedIndex);
 }
 
 /** Date만 가짜로 바꿔 두었으므로(setTimeout 등은 실제) Prisma 동작에는 영향이 없다. */
@@ -69,9 +97,17 @@ function advanceClock(ms: number) {
   vi.setSystemTime(Date.now() + ms);
 }
 
-/** 세션을 만들고 앞에서부터 correctCount개만 맞히도록 전부 답한다. */
+/**
+ * 세션을 만들고 앞에서부터 correctCount개만 맞히도록 전부 답한다 (모두 빠르게, 힌트 없이).
+ * 점수가 출제 순서(난이도·연속 정답)에 따라 달라지므로, 출제 순서를 id 오름차순으로 고정해 점수를 예측할 수 있게 한다.
+ */
 async function playSession(body: unknown, correctCount: number) {
-  const session = await createSession(body);
+  const created = await createSession(body);
+  const session = { ...created, questions: [...created.questions].sort((a, b) => a.id - b.id) };
+  await prisma.quizSession.update({
+    where: { id: session.sessionId },
+    data: { questionIds: session.questions.map((q) => q.id) },
+  });
   const key = await answerKey(session.questions.map((q) => q.id));
   for (const [i, q] of session.questions.entries()) {
     const correct = key.get(q.id)!;
@@ -123,11 +159,12 @@ describe("POST /api/sessions", () => {
 
     expect(session.questions).toHaveLength(10);
     for (const q of session.questions) {
-      expect(Object.keys(q).sort()).toEqual(["category", "id", "options", "question"]);
+      expect(Object.keys(q).sort()).toEqual(["category", "difficulty", "id", "options", "question"]);
       expect(q.category).toBe("과학");
       expect(q.options).toHaveLength(4);
     }
 
+    expect(session).toMatchObject({ mode: "CATEGORY", timeLimitMs: null });
     const stored = await prisma.quizSession.findUniqueOrThrow({ where: { id: session.sessionId } });
     expect(stored.mode).toBe("CATEGORY");
     expect(stored.questionIds).toEqual(session.questions.map((q) => q.id));
@@ -139,6 +176,16 @@ describe("POST /api/sessions", () => {
     expect(ids).toHaveLength(40);
     expect(new Set(ids).size).toBe(40);
     expect(new Set(session.questions.map((q) => q.category)).size).toBe(4);
+  });
+
+  it("스피드 모드: 전체 문제에서 무작위 20문제, 문제당 15초 제한", async () => {
+    const session = await createSession({ mode: "SPEED" });
+    const ids = session.questions.map((q) => q.id);
+    expect(session).toMatchObject({ mode: "SPEED", timeLimitMs: SPEED_TIME_LIMIT_MS });
+    expect(ids).toHaveLength(SPEED_QUESTION_COUNT);
+    expect(new Set(ids).size).toBe(SPEED_QUESTION_COUNT);
+    const stored = await prisma.quizSession.findUniqueOrThrow({ where: { id: session.sessionId } });
+    expect(stored).toMatchObject({ mode: "SPEED", categoryId: null, questionIds: ids });
   });
 
   it("문제 순서를 섞는다 (전체 모드 세션 두 개의 순서가 모두 id 순일 수는 없다)", async () => {
@@ -263,18 +310,24 @@ describe("GET /api/sessions/[id]/result", () => {
     expect(body).toMatchObject({ completed: false, submitted: false, answeredCount: 1, totalCount: 10 });
   });
 
-  it("카테고리 모드 결과: 7/10 정답 → 70점 / 100점, 정답률 70%", async () => {
+  it("카테고리 모드 결과: 7/10 정답 → 152점 / 217점, 정답률 70%", async () => {
     const { sessionId } = await playSession({ mode: "CATEGORY", categorySlug: "science" }, 7);
 
     const { body } = await read(await getResult(request(`/api/sessions/${sessionId}/result`), ctx(sessionId)));
+    // 과학 11~20번 난이도: 쉬움 11·18·20, 보통 12·14·16·17, 어려움 13·15·19
+    // 11~17번 정답: 기본 10+15+20+15+20+15+15 = 110, 빠른 답 3×7, 힌트 미사용 2×7, 콤보 2+5
+    // 만점: 기본 150 + (3+2)×10 + 콤보 2+5+10 = 217
     expect(body).toEqual({
       mode: "CATEGORY",
       category: "과학",
       categorySlug: "science",
       completed: true,
       submitted: false,
-      score: 70,
-      maxScore: 100,
+      timedOutCount: 0,
+      score: 152,
+      maxScore: 217,
+      breakdown: { base: 110, time: 21, hint: 14, combo: 7 },
+      maxStreak: 7,
       correctCount: 7,
       answeredCount: 10,
       totalCount: 10,
@@ -283,11 +336,14 @@ describe("GET /api/sessions/[id]/result", () => {
     });
   });
 
-  it("전체 모드 결과: 400점 만점이고 카테고리 4개가 정렬 순서대로 나온다", async () => {
+  it("전체 모드 결과: 카테고리 4개가 정렬 순서대로 나오고, 만점은 콤보를 다시 받는 경우까지 따진다", async () => {
     const { sessionId } = await playSession({ mode: "ALL" }, 40);
 
     const { body } = await read(await getResult(request(`/api/sessions/${sessionId}/result`), ctx(sessionId)));
-    expect(body).toMatchObject({ mode: "ALL", category: null, categorySlug: null, score: 400, maxScore: 400, accuracy: 100 });
+    // 전부 정답: 기본 4×150 + (3+2)×40 + 콤보 17 = 817
+    // 만점: 1~40번 순서에서 쉬운 11번·23번을 틀리면 1~10, 12~22, 24~40번이 각각 10연속 이상이 되어
+    // 콤보 17을 두 번 더 받는다 (17×2 − 15×2 = +4) → 821
+    expect(body).toMatchObject({ mode: "ALL", category: null, categorySlug: null, score: 817, maxScore: 821, accuracy: 100 });
     expect(body.byCategory).toEqual([
       { category: "한국사", correct: 10, total: 10 },
       { category: "과학", correct: 10, total: 10 },
@@ -308,12 +364,12 @@ describe("POST /api/sessions/[id]/submit", () => {
 
     const { status, body } = await read(await submit(sessionId, "  퀴즈왕  "));
     expect(status).toBe(201);
-    expect(body).toEqual({ rank: 1, score: 80, maxScore: 100 });
+    expect(body).toEqual({ rank: 1, score: 167, maxScore: 217 });
 
     const stored = await prisma.score.findUniqueOrThrow({ where: { sessionId } });
     expect(stored).toMatchObject({
       username: "퀴즈왕",
-      score: 80,
+      score: 167,
       correctCount: 8,
       totalCount: 10,
       mode: "CATEGORY",
@@ -379,9 +435,9 @@ describe("GET /api/leaderboard", () => {
     const { status, body } = await leaderboard("?mode=CATEGORY&category=science");
     expect(status).toBe(200);
     expect(body.map(({ rank, username, score }) => ({ rank, username, score }))).toEqual([
-      { rank: 1, username: "일등", score: 90 },
-      { rank: 2, username: "먼저옴", score: 60 },
-      { rank: 3, username: "나중옴", score: 60 },
+      { rank: 1, username: "일등", score: 192 },
+      { rank: 2, username: "먼저옴", score: 132 },
+      { rank: 3, username: "나중옴", score: 132 },
     ]);
   });
 
@@ -392,7 +448,8 @@ describe("GET /api/leaderboard", () => {
     await submit(science.sessionId, "과학모드");
 
     const allBoard = (await leaderboard("")).body;
-    expect(allBoard.map((e) => [e.username, e.maxScore])).toEqual([["전체모드", 400]]);
+    expect(allBoard.map((e) => [e.username, e.maxScore])).toEqual([["전체모드", 821]]);
+    expect((await leaderboard("?mode=SPEED")).body).toEqual([]);
 
     const scienceBoard = (await leaderboard("?mode=CATEGORY&category=science")).body;
     expect(scienceBoard.map((e) => e.username)).toEqual(["과학모드"]);
@@ -477,13 +534,14 @@ describe("답안 간격 제한 (세션당 1초)", () => {
     expect((await answerNow(sessionId, questions[1].id, 0)).status).toBe(200);
   });
 
-  it("여러 문제의 답안을 동시에 보내도 하나만 받아들인다 (세션 행 잠금)", async () => {
+  it("같은 문제에 다른 보기를 동시에 보내도 하나만 받아들인다 (세션 행 잠금)", async () => {
     const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    await openQuestion(sessionId, questions[0].id);
     advanceClock(MIN_ANSWER_INTERVAL_MS);
 
-    const responses = await Promise.all(questions.slice(0, 5).map((q) => answerNow(sessionId, q.id, 0)));
+    const responses = await Promise.all([0, 1, 2, 3].map((i) => postAnswerOnly(sessionId, questions[0].id, i)));
     const statuses = responses.map((r) => r.status).sort();
-    expect(statuses).toEqual([200, 429, 429, 429, 429]);
+    expect(statuses).toEqual([200, 409, 409, 409]);
     expect(await prisma.sessionAnswer.count({ where: { sessionId } })).toBe(1);
   });
 
@@ -529,20 +587,22 @@ describe("IP별 요청 횟수 제한", () => {
     expect((await create("203.0.113.9")).status).toBe(429);
   });
 
-  it("답안·점수 등록 라우트에도 한도가 걸려 있다", async () => {
+  it("문제 열기·힌트·답안·점수 등록 라우트에도 한도가 걸려 있다", async () => {
     const { sessionId, questions } = await playSession({ mode: "CATEGORY", categorySlug: "science" }, 5);
     const windowStart = (seconds: number) =>
       new Date(Math.floor(Date.now() / (seconds * 1000)) * seconds * 1000);
     // 현재 윈도의 카운터를 한도까지 채워 둔다 (unknown = X-Forwarded-For가 없는 요청).
     // playSession이 이미 answer 카운터를 만들었으므로 upsert로 덮어쓴다.
-    for (const rule of ["answer", "submitScore"] as const) {
+    for (const rule of ["openQuestion", "hint", "answer", "submitScore"] as const) {
       const where = {
         key_windowStart: { key: `${rule}:unknown`, windowStart: windowStart(RATE_LIMITS[rule].windowSeconds) },
       };
       const count = RATE_LIMITS[rule].limit;
       await prisma.rateLimit.upsert({ where, update: { count }, create: { ...where.key_windowStart, count } });
     }
-    expect((await answer(sessionId, questions[0].id, 0)).status).toBe(429);
+    expect((await openQuestion(sessionId, questions[0].id)).status).toBe(429);
+    expect((await requestHint(sessionId, questions[0].id)).status).toBe(429);
+    expect((await postAnswerOnly(sessionId, questions[0].id, 0)).status).toBe(429);
     expect((await submit(sessionId, "한도초과")).status).toBe(429);
     expect(await prisma.score.count()).toBe(0);
   });
@@ -639,6 +699,7 @@ describe("멱등성: 응답을 못 받아 같은 요청을 다시 보낸 경우"
     const stored = await prisma.sessionAnswer.findUniqueOrThrow({
       where: { sessionId_questionId: { sessionId, questionId: last.id } },
     });
+    expect(stored.selectedIndex).not.toBeNull();
     expect((await answerNow(sessionId, last.id, stored.selectedIndex)).status).toBe(200);
     const result = await read(await getResult(request(`/api/sessions/${sessionId}/result`), ctx(sessionId)));
     expect(result.body).toMatchObject({ completed: true, answeredCount: 10, correctCount: 4 });
@@ -737,9 +798,11 @@ describe("결과 화면과 점수 등록의 일관성", () => {
 });
 
 describe("경계 입력: 라우트가 500 없이 거절한다", () => {
-  it.each(["null", "[]", "42", '"ALL"', "true"])("객체가 아닌 JSON 본문 %s → 세 POST 라우트 모두 400", async (text) => {
+  it.each(["null", "[]", "42", '"ALL"', "true"])("객체가 아닌 JSON 본문 %s → POST 라우트 모두 400", async (text) => {
     const { sessionId } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
     expect((await postSession(request("/api/sessions", text))).status).toBe(400);
+    expect((await postView(request(`/api/sessions/${sessionId}/views`, text), ctx(sessionId))).status).toBe(400);
+    expect((await postHint(request(`/api/sessions/${sessionId}/hints`, text), ctx(sessionId))).status).toBe(400);
     expect((await postAnswer(request(`/api/sessions/${sessionId}/answers`, text), ctx(sessionId))).status).toBe(400);
     expect((await postSubmit(request(`/api/sessions/${sessionId}/submit`, text), ctx(sessionId))).status).toBe(400);
   });
@@ -761,9 +824,15 @@ describe("경계 입력: 라우트가 500 없이 거절한다", () => {
     "Postgres int4 범위를 넘는 questionId %d도 DB 오류(500) 없이 400",
     async (questionId) => {
       const { sessionId } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
-      const { status, body } = await read(await answer(sessionId, questionId, 0));
-      expect(status).toBe(400);
-      expect(body.error?.code).toBe("BAD_REQUEST");
+      for (const res of [
+        await openQuestion(sessionId, questionId),
+        await requestHint(sessionId, questionId),
+        await postAnswerOnly(sessionId, questionId, 0),
+      ]) {
+        const { status, body } = await read(res);
+        expect(status).toBe(400);
+        expect(body.error?.code).toBe("BAD_REQUEST");
+      }
     },
   );
 
@@ -818,5 +887,241 @@ describe("요청 한도: 시간 창 경계", () => {
   it("규칙마다 카운터가 따로다 (점수 등록 한도를 다 써도 세션 생성은 가능)", async () => {
     for (let i = 0; i < limit; i++) await consumeRateLimit("submitScore", "198.51.100.79", at(0));
     await expect(consumeRateLimit("createSession", "198.51.100.79", at(0))).resolves.toBeUndefined();
+  });
+});
+
+describe("POST /api/sessions/[id]/views (문제 열기)", () => {
+  it("출제 순서대로만 열 수 있다: 앞 문제에 답하기 전에 다음 문제를 열면 409", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const early = await read(await openQuestion(sessionId, questions[1].id));
+    expect(early.status).toBe(409);
+    expect(early.body.error?.message).toContain("이전 문제");
+
+    const first = await read(await openQuestion(sessionId, questions[0].id));
+    expect(first).toEqual({
+      status: 200,
+      body: { questionId: questions[0].id, timeLimitMs: null, remainingMs: null, removedOptions: [] },
+    });
+    expect((await answer(sessionId, questions[0].id, 0)).status).toBe(200);
+    expect((await openQuestion(sessionId, questions[1].id)).status).toBe(200);
+  });
+
+  it("열지 않은 문제에 답하면 409이고 저장되지 않는다", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    advanceClock(MIN_ANSWER_INTERVAL_MS);
+    const { status, body } = await read(await postAnswerOnly(sessionId, questions[0].id, 0));
+    expect(status).toBe(409);
+    expect(body.error?.message).toContain("문제를 먼저 불러와");
+    expect(await prisma.sessionAnswer.count({ where: { sessionId } })).toBe(0);
+  });
+
+  it("다시 열어도 처음 연 시각을 쓴다 (스피드 모드 남은 시간이 그대로 줄어든다)", async () => {
+    const { sessionId, questions } = await createSession({ mode: "SPEED" });
+    const id = questions[0].id;
+    expect((await read(await openQuestion(sessionId, id))).body).toMatchObject({
+      timeLimitMs: SPEED_TIME_LIMIT_MS,
+      remainingMs: SPEED_TIME_LIMIT_MS,
+    });
+    advanceClock(4000);
+    expect((await read(await openQuestion(sessionId, id))).body).toMatchObject({ remainingMs: SPEED_TIME_LIMIT_MS - 4000 });
+    advanceClock(SPEED_TIME_LIMIT_MS);
+    expect((await read(await openQuestion(sessionId, id))).body).toMatchObject({ remainingMs: 0 });
+    expect(await prisma.sessionQuestionView.count({ where: { sessionId } })).toBe(1);
+  });
+
+  it.each([UNKNOWN_SESSION_ID, "not-a-uuid"])("존재하지 않는 세션 %s → 404", async (id) => {
+    expect((await openQuestion(id, 1)).status).toBe(404);
+    expect((await requestHint(id, 1)).status).toBe(404);
+  });
+
+  it("세션에 없는 문제 → 400, 만료된 세션 → 404", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const history = await prisma.question.findFirstOrThrow({ where: { category: { slug: "korean-history" } } });
+    expect((await openQuestion(sessionId, history.id)).status).toBe(400);
+    expect((await requestHint(sessionId, history.id)).status).toBe(400);
+
+    advanceClock(SESSION_TTL_MS + 1000);
+    expect((await openQuestion(sessionId, questions[0].id)).status).toBe(404);
+  });
+});
+
+describe("POST /api/sessions/[id]/hints (50:50)", () => {
+  it("정답이 아닌 보기 2개를 지우고, 다시 요청하거나 문제를 다시 열어도 같은 보기를 돌려준다", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const q = questions[0];
+    const correct = (await answerKey([q.id])).get(q.id)!;
+    await openQuestion(sessionId, q.id);
+
+    const first = await read<{ questionId: number; removedOptions: number[] }>(await requestHint(sessionId, q.id));
+    expect(first.status).toBe(200);
+    expect(first.body.questionId).toBe(q.id);
+    expect(first.body.removedOptions).toHaveLength(2);
+    expect(first.body.removedOptions).not.toContain(correct);
+    expect(first.body.removedOptions).toEqual([...first.body.removedOptions].sort((a, b) => a - b));
+
+    expect((await read(await requestHint(sessionId, q.id))).body).toEqual(first.body);
+    expect((await read(await openQuestion(sessionId, q.id))).body).toMatchObject({
+      removedOptions: first.body.removedOptions,
+    });
+  });
+
+  it("문제를 열기 전에는 409, 답한 뒤에는 409", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const q = questions[0];
+    expect((await requestHint(sessionId, q.id)).status).toBe(409);
+
+    expect((await answer(sessionId, q.id, 0)).status).toBe(200);
+    const late = await read(await requestHint(sessionId, q.id));
+    expect(late.status).toBe(409);
+    expect(late.body.error?.message).toBe("이미 답한 문제입니다.");
+    const view = await prisma.sessionQuestionView.findUniqueOrThrow({
+      where: { sessionId_questionId: { sessionId, questionId: q.id } },
+    });
+    expect(view.hintRemoved).toEqual([]);
+  });
+
+  it("힌트를 쓰고 맞히면 힌트 미사용 보너스가 없고, 답안에 힌트 사용이 기록된다", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const q = questions[0];
+    const correct = (await answerKey([q.id])).get(q.id)!;
+    await openQuestion(sessionId, q.id);
+    await requestHint(sessionId, q.id);
+
+    const { body } = await read<Feedback>(await answer(sessionId, q.id, correct));
+    expect(body.points).toMatchObject({ time: 3, hint: 0 });
+    const stored = await prisma.sessionAnswer.findUniqueOrThrow({
+      where: { sessionId_questionId: { sessionId, questionId: q.id } },
+    });
+    expect(stored).toMatchObject({ hintUsed: true, isCorrect: true, timedOut: false });
+  });
+});
+
+describe("답안 점수: 난이도 배수·시간·힌트·콤보", () => {
+  const BASE: Record<string, number> = { EASY: 10, MEDIUM: 15, HARD: 20 };
+
+  it("문제를 연 뒤 10초 안에 맞히면 시간 보너스, 10초가 지나면 없고, 오답은 0점에 연속이 끊긴다", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "korean-history" });
+    const key = await answerKey(questions.map((q) => q.id));
+    const [q0, q1, q2] = questions;
+
+    await openQuestion(sessionId, q0.id);
+    advanceClock(9_999);
+    const fast = await read<Feedback>(await postAnswerOnly(sessionId, q0.id, key.get(q0.id)!));
+    const fastTotal = BASE[q0.difficulty] + 3 + 2;
+    expect(fast.body).toMatchObject({
+      isCorrect: true,
+      timedOut: false,
+      points: { base: BASE[q0.difficulty], time: 3, hint: 2, combo: 0, total: fastTotal },
+      streak: 1,
+      score: fastTotal,
+    });
+
+    await openQuestion(sessionId, q1.id);
+    advanceClock(10_000);
+    const slow = await read<Feedback>(await postAnswerOnly(sessionId, q1.id, key.get(q1.id)!));
+    const slowTotal = BASE[q1.difficulty] + 2;
+    expect(slow.body).toMatchObject({
+      points: { base: BASE[q1.difficulty], time: 0, hint: 2, combo: 0, total: slowTotal },
+      streak: 2,
+      score: fastTotal + slowTotal,
+    });
+    const stored = await prisma.sessionAnswer.findUniqueOrThrow({
+      where: { sessionId_questionId: { sessionId, questionId: q1.id } },
+    });
+    expect(stored.elapsedMs).toBe(10_000);
+
+    const wrong = await read<Feedback>(await answer(sessionId, q2.id, (key.get(q2.id)! + 1) % 4));
+    expect(wrong.body).toMatchObject({
+      isCorrect: false,
+      points: { base: 0, time: 0, hint: 0, combo: 0, total: 0 },
+      streak: 0,
+      score: fastTotal + slowTotal,
+    });
+  });
+
+  it("3연속째 정답에서 콤보 +2를 받는다", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "geography" });
+    const key = await answerKey(questions.map((q) => q.id));
+    const combos: number[] = [];
+    for (const q of questions.slice(0, 3)) {
+      combos.push((await read<Feedback>(await answer(sessionId, q.id, key.get(q.id)!))).body.points.combo);
+    }
+    expect(combos).toEqual([0, 0, 2]);
+  });
+});
+
+describe("스피드 퀴즈 제한 시간", () => {
+  async function speedFirstQuestion() {
+    const session = await createSession({ mode: "SPEED" });
+    const q = session.questions[0];
+    const correct = (await answerKey([q.id])).get(q.id)!;
+    await openQuestion(session.sessionId, q.id);
+    return { sessionId: session.sessionId, session, q, correct };
+  }
+
+  it("제한 시간 + 여유(네트워크 지연) 안에 온 정답은 인정한다", async () => {
+    const { sessionId, q, correct } = await speedFirstQuestion();
+    advanceClock(SPEED_TIME_LIMIT_MS + SPEED_DEADLINE_GRACE_MS);
+    const { body } = await read<Feedback>(await postAnswerOnly(sessionId, q.id, correct));
+    expect(body).toMatchObject({ isCorrect: true, timedOut: false, points: { time: 0 } });
+  });
+
+  it("제한 시간 + 여유를 넘긴 답안은 정답이어도 시간 초과 오답이다", async () => {
+    const { sessionId, q, correct } = await speedFirstQuestion();
+    advanceClock(SPEED_TIME_LIMIT_MS + SPEED_DEADLINE_GRACE_MS + 1);
+    const { status, body } = await read<Feedback>(await postAnswerOnly(sessionId, q.id, correct));
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ isCorrect: false, timedOut: true, answerIndex: correct, points: { total: 0 } });
+    const stored = await prisma.sessionAnswer.findUniqueOrThrow({
+      where: { sessionId_questionId: { sessionId, questionId: q.id } },
+    });
+    expect(stored).toMatchObject({ isCorrect: false, timedOut: true, selectedIndex: correct });
+  });
+
+  it("보기 없이(null) 보내면 시간 초과로 기록하고, 재전송은 같은 결과, 다른 보기는 409", async () => {
+    const { sessionId, q, correct } = await speedFirstQuestion();
+    advanceClock(SPEED_TIME_LIMIT_MS);
+    const first = await read<Feedback>(await postAnswerOnly(sessionId, q.id, null));
+    expect(first.body).toMatchObject({ isCorrect: false, timedOut: true, answerIndex: correct });
+    expect(typeof first.body.explanation).toBe("string");
+
+    const replay = await read(await postAnswerOnly(sessionId, q.id, null));
+    expect(replay).toEqual(first);
+    expect((await postAnswerOnly(sessionId, q.id, correct)).status).toBe(409);
+    const stored = await prisma.sessionAnswer.findUniqueOrThrow({
+      where: { sessionId_questionId: { sessionId, questionId: q.id } },
+    });
+    expect(stored.selectedIndex).toBeNull();
+  });
+
+  it("제한 시간이 없는 모드에서 보기 없이(null) 보내면 400", async () => {
+    const { sessionId, questions } = await createSession({ mode: "CATEGORY", categorySlug: "science" });
+    const { status, body } = await read(await answer(sessionId, questions[0].id, null));
+    expect(status).toBe(400);
+    expect(body.error?.code).toBe("BAD_REQUEST");
+    expect(await prisma.sessionAnswer.count({ where: { sessionId } })).toBe(0);
+  });
+
+  it("결과에 시간 초과 수가 나오고, 점수는 스피드 순위표에 따로 쌓인다", async () => {
+    const session = await createSession({ mode: "SPEED" });
+    const key = await answerKey(session.questions.map((q) => q.id));
+    for (const [i, q] of session.questions.entries()) {
+      const res = await answer(session.sessionId, q.id, i < 3 ? null : key.get(q.id)!);
+      expect(res.status).toBe(200);
+    }
+
+    const result = await read(await getResult(request(`/api/sessions/${session.sessionId}/result`), ctx(session.sessionId)));
+    expect(result.body).toMatchObject({
+      mode: "SPEED",
+      completed: true,
+      timedOutCount: 3,
+      correctCount: SPEED_QUESTION_COUNT - 3,
+      totalCount: SPEED_QUESTION_COUNT,
+    });
+
+    expect((await submit(session.sessionId, "번개손")).status).toBe(201);
+    const speedBoard = (await leaderboard("?mode=SPEED")).body;
+    expect(speedBoard.map((e) => [e.username, e.score])).toEqual([["번개손", result.body.score]]);
+    expect((await leaderboard("")).body).toEqual([]);
   });
 });

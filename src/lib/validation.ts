@@ -3,16 +3,23 @@ import { USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from "@/lib/limits";
 
 export const LEADERBOARD_LIMITS = ["10", "50"] as const;
 
-export const quizModeSchema = z.enum(["ALL", "CATEGORY"]);
+export const quizModeSchema = z.enum(["ALL", "CATEGORY", "SPEED"]);
 
 export const createSessionSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("ALL") }),
   z.object({ mode: z.literal("CATEGORY"), categorySlug: z.string().trim().min(1) }),
+  z.object({ mode: z.literal("SPEED") }),
 ]);
 
+const questionIdSchema = z.number().int().positive();
+
+/** 문제 열기(시간 측정 시작)와 50:50 힌트 요청 */
+export const questionRefSchema = z.object({ questionId: questionIdSchema });
+
 export const submitAnswerSchema = z.object({
-  questionId: z.number().int().positive(),
-  selectedIndex: z.number().int().min(0).max(3),
+  questionId: questionIdSchema,
+  // null: 스피드 퀴즈에서 보기를 고르지 못하고 제한 시간이 끝남
+  selectedIndex: z.number().int().min(0).max(3).nullable(),
 });
 
 // 순위표에서 닉네임 사칭·빈 닉네임에 쓰이는 문자:
@@ -60,10 +67,11 @@ export const leaderboardQuerySchema = z
     message: "mode=CATEGORY에는 category가 필요합니다.",
     path: ["category"],
   })
-  // ALL 모드에서는 category를 무시한다.
-  .transform((q) => (q.mode === "ALL" ? { ...q, category: undefined } : q));
+  // 카테고리 모드가 아니면 category를 무시한다.
+  .transform((q) => (q.mode === "CATEGORY" ? q : { ...q, category: undefined }));
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
+export type QuestionRefInput = z.infer<typeof questionRefSchema>;
 export type SubmitAnswerInput = z.infer<typeof submitAnswerSchema>;
 export type SubmitScoreInput = z.infer<typeof submitScoreSchema>;
 export type LeaderboardQuery = z.infer<typeof leaderboardQuerySchema>;

@@ -14,6 +14,10 @@ export const RATE_LIMITS = {
   createSession: { limit: 30, windowSeconds: 10 * 60 },
   /** 답안 제출: 1분에 300회 (세션 안에서는 별도로 1초 간격 제한이 걸린다) */
   answer: { limit: 300, windowSeconds: 60 },
+  /** 문제 열기(답안 시간 측정 시작): 답안과 같은 한도 */
+  openQuestion: { limit: 300, windowSeconds: 60 },
+  /** 50:50 힌트: 문제당 한 번이라 답안과 같은 한도면 충분하다 */
+  hint: { limit: 300, windowSeconds: 60 },
   /** 순위표 등록: 1시간에 20회 */
   submitScore: { limit: 20, windowSeconds: 60 * 60 },
 } as const;

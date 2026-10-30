@@ -8,6 +8,12 @@ export function uniqueNickname(): string {
   return `${E2E_USERNAME_PREFIX}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** 퀴즈 화면 상단의 지금까지의 총점 ("점수 N점") */
+export async function currentScore(page: Page): Promise<number> {
+  const text = await page.getByText(/^점수 \d+점/).innerText();
+  return Number(/점수 (\d+)점/.exec(text)?.[1]);
+}
+
 /** 보기 버튼(aria-label "N번. 보기 (상태)") */
 export const optionButtons = (page: Page) => page.getByRole("button", { name: /^[1-4]번\./ });
 

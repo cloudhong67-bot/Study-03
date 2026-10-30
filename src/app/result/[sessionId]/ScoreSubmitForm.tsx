@@ -6,15 +6,16 @@ import { primaryButton } from "@/components/button-styles";
 import { ApiError, errorMessage, postJson } from "@/lib/http-client";
 import { USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from "@/lib/limits";
 import type { SubmittedScore } from "@/lib/quiz/scores";
-import { leaderboardHref } from "@/lib/routes";
+import { leaderboardHref, type QuizMode } from "@/lib/routes";
 
 interface ScoreSubmitFormProps {
   sessionId: string;
   submitted: boolean;
+  mode: QuizMode;
   categorySlug: string | null;
 }
 
-export function ScoreSubmitForm({ sessionId, submitted, categorySlug }: ScoreSubmitFormProps) {
+export function ScoreSubmitForm({ sessionId, submitted, mode, categorySlug }: ScoreSubmitFormProps) {
   const router = useRouter();
   const inputId = useId();
   const [username, setUsername] = useState("");
@@ -36,7 +37,7 @@ export function ScoreSubmitForm({ sessionId, submitted, categorySlug }: ScoreSub
     try {
       // 점수 등록은 멱등이다(같은 닉네임으로 다시 보내면 서버가 처음 결과를 돌려준다) → 자동 재시도해도 안전하다.
       const data = await postJson<SubmittedScore>(`/api/sessions/${sessionId}/submit`, { username }, { retries: 2 });
-      router.push(leaderboardHref({ categorySlug, highlight: data.rank, limit: data.rank > 10 ? 50 : 10 }));
+      router.push(leaderboardHref({ mode, categorySlug, highlight: data.rank, limit: data.rank > 10 ? 50 : 10 }));
     } catch (e) {
       setError(errorMessage(e));
       setPending(false);

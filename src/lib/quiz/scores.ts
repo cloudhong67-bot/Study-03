@@ -4,7 +4,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { AppError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { getCategoryBySlug } from "@/lib/quiz/categories";
-import { assertNotExpired, sessionNotFound, summarizeSession } from "@/lib/quiz/sessions";
+import { ANSWER_RECORD_SELECT, assertNotExpired, sessionNotFound, summarizeSession } from "@/lib/quiz/sessions";
 import type { LeaderboardQuery, SubmitScoreInput } from "@/lib/validation";
 
 const alreadySubmitted = () => new AppError("CONFLICT", "이미 점수를 등록한 세션입니다.");
@@ -17,7 +17,7 @@ const alreadySubmitted = () => new AppError("CONFLICT", "이미 점수를 등록
 export async function submitScore(sessionId: string, input: SubmitScoreInput) {
   const session = await prisma.quizSession.findUnique({
     where: { id: sessionId },
-    include: { answers: { select: { questionId: true, isCorrect: true } }, score: true },
+    include: { answers: { select: ANSWER_RECORD_SELECT }, score: true },
   });
   if (!session) throw sessionNotFound();
   if (session.score) return replay(session.score, input);

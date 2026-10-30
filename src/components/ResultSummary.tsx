@@ -7,12 +7,25 @@ function verdict(accuracy: number) {
   return "다시 도전해 볼까요? 📚";
 }
 
+function quizLabel(result: QuizResult) {
+  if (result.category) return `${result.category} 퀴즈`;
+  return result.mode === "SPEED" ? `스피드 퀴즈 ${result.totalCount}문제` : `전체 ${result.totalCount}문제`;
+}
+
 export function ResultSummary({ result }: { result: QuizResult }) {
+  const { breakdown } = result;
+  const rows = [
+    { label: "기본 점수 (난이도 배수)", value: breakdown.base },
+    { label: "빠른 답 보너스", value: breakdown.time },
+    { label: "힌트 미사용 보너스", value: breakdown.hint },
+    { label: "콤보 보너스", value: breakdown.combo },
+  ];
+
   return (
     <section aria-label="결과 요약" className="space-y-4">
       <div className="rounded-3xl border border-border bg-surface p-6 text-center shadow-sm">
         <p className="text-sm font-semibold text-muted">
-          {result.category ? `${result.category} 퀴즈` : "전체 40문제"} 최종 점수
+          {quizLabel(result)} 최종 점수
         </p>
         <p className="mt-2 font-extrabold tabular-nums">
           <span className="text-5xl text-indigo-600 dark:text-indigo-400">{result.score}</span>
@@ -31,6 +44,28 @@ export function ResultSummary({ result }: { result: QuizResult }) {
               {result.correctCount} <span className="text-sm text-muted">/ {result.totalCount}</span>
             </dd>
           </div>
+        </dl>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-surface p-5 shadow-sm">
+        <h2 className="text-sm font-bold">점수 구성</h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          {rows.map((row) => (
+            <div key={row.label} className="flex justify-between">
+              <dt className="text-muted">{row.label}</dt>
+              <dd className="font-semibold tabular-nums">{row.value}점</dd>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-border pt-2">
+            <dt className="text-muted">최대 연속 정답</dt>
+            <dd className="font-semibold tabular-nums">🔥 {result.maxStreak}연속</dd>
+          </div>
+          {result.mode === "SPEED" && (
+            <div className="flex justify-between">
+              <dt className="text-muted">시간 초과</dt>
+              <dd className="font-semibold tabular-nums">⏰ {result.timedOutCount}문제</dd>
+            </div>
+          )}
         </dl>
       </div>
 

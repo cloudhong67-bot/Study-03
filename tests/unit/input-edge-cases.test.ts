@@ -7,7 +7,7 @@ import { isTransientDatabaseError, isUniqueViolation } from "@/lib/db-errors";
 import { AppError, isNotFoundError } from "@/lib/errors";
 import { firstParam, flattenSearchParams } from "@/lib/page-helpers";
 import { buildResultSummary, sessionQuestionInfos } from "@/lib/quiz/summary";
-import { calculateAccuracy, calculateMaxScore, calculateScore } from "@/lib/scoring";
+import { calculateAccuracy, calculateMaxScore } from "@/lib/scoring";
 import { shuffle } from "@/lib/shuffle";
 import {
   createSessionSchema,
@@ -59,8 +59,12 @@ describe("submitAnswerSchema: 숫자 극값", () => {
     expect(ok(submitAnswerSchema, { questionId: Number.MAX_SAFE_INTEGER, selectedIndex: 0 })).toBe(true);
   });
 
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0.5, "0", null, undefined])("selectedIndex %j는 거부", (selectedIndex) => {
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0.5, "0", undefined])("selectedIndex %j는 거부", (selectedIndex) => {
     expect(ok(submitAnswerSchema, { questionId: 1, selectedIndex })).toBe(false);
+  });
+
+  it("selectedIndex null(시간 초과)은 형식상 통과한다 (제한 시간이 없는 모드면 서비스에서 400으로 거부)", () => {
+    expect(ok(submitAnswerSchema, { questionId: 1, selectedIndex: null })).toBe(true);
   });
 });
 
@@ -121,8 +125,7 @@ describe("scoring: 반올림·0 경계", () => {
   });
 
   it("0문제·0정답은 0점·0%", () => {
-    expect(calculateScore(0)).toBe(0);
-    expect(calculateMaxScore(0)).toBe(0);
+    expect(calculateMaxScore([])).toBe(0);
     expect(calculateAccuracy(0, 0)).toBe(0);
     expect(calculateAccuracy(0, 10)).toBe(0);
   });
@@ -162,6 +165,8 @@ describe("결과 집계: 빈 입력·중복", () => {
     expect(buildResultSummary([], [])).toEqual({
       score: 0,
       maxScore: 0,
+      breakdown: { base: 0, time: 0, hint: 0, combo: 0 },
+      maxStreak: 0,
       correctCount: 0,
       answeredCount: 0,
       totalCount: 0,
@@ -172,17 +177,18 @@ describe("결과 집계: 빈 입력·중복", () => {
 
   it("같은 문제의 정답 기록이 중복돼도 한 번만 센다", () => {
     const summary = buildResultSummary(
-      [{ id: 1, categoryName: "과학", categorySortOrder: 1 }],
+      [{ id: 1, categoryName: "과학", categorySortOrder: 1, difficulty: "EASY" }],
       [
-        { questionId: 1, isCorrect: true },
-        { questionId: 1, isCorrect: true },
+        { questionId: 1, isCorrect: true, elapsedMs: null, hintUsed: false },
+        { questionId: 1, isCorrect: true, elapsedMs: null, hintUsed: false },
       ],
     );
-    expect(summary).toMatchObject({ correctCount: 1, score: 10, totalCount: 1, accuracy: 100 });
+    // 기본 10 + 힌트 미사용 2
+    expect(summary).toMatchObject({ correctCount: 1, score: 12, totalCount: 1, accuracy: 100 });
   });
 
   it("출제 목록이 비면 문제 정보도 비고, 목록에 없는 행은 무시한다", () => {
-    expect(sessionQuestionInfos([], [{ id: 1, category: { name: "과학", sortOrder: 1 } }])).toEqual([]);
+    expect(sessionQuestionInfos([], [{ id: 1, difficulty: "EASY", category: { name: "과학", sortOrder: 1 } }])).toEqual([]);
   });
 });
 

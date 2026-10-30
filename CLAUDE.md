@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. Sections 6–12 are the agreed technical plan: architecture, file structure, Prisma schema, API spec, Docker, Azure Container Apps deployment, and roadmap. Roadmap steps 1–5 are done: scaffold; schema, migration, and seed; the backend API with tests; the four UI screens; and Docker with Playwright E2E. CI exists (`.github/workflows/ci.yml`, see below). Only step 6, Azure Container Apps deployment and the CD workflow (PRD §11), remains. The folder is not yet a git repository, so CI runs only after the project is pushed to GitHub. PRD §9 documents the API exactly as implemented, so update it when you change a response shape.
+The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. Sections 6–12 are the agreed technical plan: architecture, file structure, Prisma schema, API spec, Docker, Azure Container Apps deployment, and roadmap. Roadmap steps 1–5 are done: scaffold; schema, migration, and seed; the backend API with tests; the four UI screens; and Docker with Playwright E2E. CI exists (`.github/workflows/ci.yml`, see below). Only step 6, Azure Container Apps deployment and the CD workflow (PRD §11), remains. The repo is on GitHub at `cloudhong67-bot/Study-03` (branch `main`, LF line endings enforced by `.gitattributes`), and pushes to `main` and PRs trigger CI. PRD §9 documents the API exactly as implemented, so update it when you change a response shape.
 
 `PRD.md` is the source of truth for requirements. Read it before you implement a feature. Keep user-facing text in Korean to match the spec.
 
@@ -25,7 +25,10 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
   - `npm run db:seed` (`node prisma/seed.mjs`)
   - `npm run db:generate` (also runs on `postinstall`)
 - Use the `PrismaClient` singleton in `src/lib/prisma.ts`.
-- Full stack in containers: `docker compose up --build -d` starts db plus app on **http://127.0.0.1:3001**. Override the port with `APP_PORT`. Use `127.0.0.1`, not `localhost`, because on this machine `[::1]:3000` is held by a WSL service.
+- Full stack in containers:
+  - `npm run local:up` (`docker compose up --build --detach --wait`) builds and starts db plus app, and returns once both are healthy. The app is on **http://127.0.0.1:3001**.
+  - `npm run local:down` stops them and keeps the DB volume (add `-v` via `docker compose down -v` only to wipe data).
+  - `npm run local:logs` follows the app logs (last 100 lines, then streams; Ctrl+C to exit). Override the port with `APP_PORT`. Use `127.0.0.1`, not `localhost`, because on this machine `[::1]:3000` is held by a WSL service.
 - E2E: `npm run test:e2e` (Playwright) runs against the compose app, so start the stack first. Run one test with `npx playwright test -g "<name>"`. Point `E2E_BASE_URL` at another target to test it instead. The first time on a machine, run `npx playwright install chromium`.
 
 ## CI (`.github/workflows/ci.yml`)

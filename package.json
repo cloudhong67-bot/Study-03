@@ -17,7 +17,10 @@
     "lint:hooks": "eslint --config eslint.hooks.config.mjs --max-warnings 0 src",
     "lint:next": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "local:up": "docker compose up --build --detach --wait",
+    "local:down": "docker compose down",
+    "local:logs": "docker compose logs --follow --tail 100 app"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

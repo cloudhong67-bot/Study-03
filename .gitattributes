@@ -1,2 +1,10 @@
-# 컨테이너(Linux)에서 실행되는 셸 스크립트는 Windows에서 체크아웃해도 LF를 유지해야 한다.
-*.sh text eol=lf
+# 모든 텍스트 파일을 저장소·작업 폴더 모두 LF로 유지한다 (Windows의 core.autocrlf=true 무시).
+# - Prisma는 migration.sql의 체크섬으로 적용 여부를 판단하므로, 줄바꿈이 바뀌면 "적용 후 수정됨"이 된다.
+# - 컨테이너(Linux)에서 실행되는 셸 스크립트·설정은 CRLF면 실패한다.
+* text=auto eol=lf
+
+# 바이너리
+*.ico binary
+*.png binary
+*.jpg binary
+*.woff2 binary

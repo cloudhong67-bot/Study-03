@@ -2,6 +2,7 @@
   {
     "id": 1,
     "category": "한국사",
+    "difficulty": "easy",
     "question": "훈민정음을 창제한 조선의 왕은 누구일까요?",
     "options": ["태종", "성종", "세조", "세종"],
     "answer_index": 3,
@@ -10,6 +11,7 @@
   {
     "id": 2,
     "category": "한국사",
+    "difficulty": "medium",
     "question": "918년 고려를 건국한 인물은 누구일까요?",
     "options": ["왕건", "견훤", "궁예", "이성계"],
     "answer_index": 0,
@@ -18,6 +20,7 @@
   {
     "id": 3,
     "category": "한국사",
+    "difficulty": "easy",
     "question": "임진왜란 때 학익진 전법으로 한산도 대첩을 승리로 이끈 장수는 누구일까요?",
     "options": ["권율", "김시민", "이순신", "곽재우"],
     "answer_index": 2,
@@ -26,6 +29,7 @@
   {
     "id": 4,
     "category": "한국사",
+    "difficulty": "medium",
     "question": "일제 강점기에 전국적인 독립 만세 운동인 3·1 운동이 일어난 해는 언제일까요?",
     "options": ["1910년", "1919년", "1926년", "1945년"],
     "answer_index": 1,
@@ -34,6 +38,7 @@
   {
     "id": 5,
     "category": "한국사",
+    "difficulty": "hard",
     "question": "676년 당나라 세력을 몰아내고 삼국 통일을 완성한 신라의 왕은 누구일까요?",
     "options": ["태종 무열왕", "법흥왕", "진흥왕", "문무왕"],
     "answer_index": 3,
@@ -42,6 +47,7 @@
   {
     "id": 6,
     "category": "한국사",
+    "difficulty": "easy",
     "question": "우리 민족 최초의 국가인 고조선을 세운 것으로 전해지는 인물은 누구일까요?",
     "options": ["단군왕검", "주몽", "온조", "박혁거세"],
     "answer_index": 0,
@@ -50,6 +56,7 @@
   {
     "id": 7,
     "category": "한국사",
+    "difficulty": "medium",
     "question": "수원 화성을 쌓을 때 무거운 돌을 들어 올리는 거중기를 고안한 조선 후기의 실학자는 누구일까요?",
     "options": ["박지원", "유형원", "정약용", "김정희"],
     "answer_index": 2,
@@ -58,6 +65,7 @@
   {
     "id": 8,
     "category": "한국사",
+    "difficulty": "hard",
     "question": "1919년 대한민국 임시정부가 수립된 도시는 어디일까요?",
     "options": ["베이징", "상하이", "도쿄", "블라디보스토크"],
     "answer_index": 1,
@@ -66,6 +74,7 @@
   {
     "id": 9,
     "category": "한국사",
+    "difficulty": "hard",
     "question": "고구려 광개토대왕의 업적을 새긴 광개토대왕릉비가 있는 곳은 어디일까요?",
     "options": ["평양", "부여", "경주", "지안(집안)"],
     "answer_index": 3,
@@ -74,6 +83,7 @@
   {
     "id": 10,
     "category": "한국사",
+    "difficulty": "medium",
     "question": "현존하는 세계에서 가장 오래된 금속활자 인쇄본으로 알려진 고려의 책은 무엇일까요?",
     "options": ["직지심체요절", "팔만대장경", "삼국사기", "동국정운"],
     "answer_index": 0,
@@ -82,6 +92,7 @@
   {
     "id": 11,
     "category": "과학",
+    "difficulty": "easy",
     "question": "물의 화학식은 무엇일까요?",
     "options": ["O₂", "CO₂", "H₂O", "NaCl"],
     "answer_index": 2,
@@ -90,6 +101,7 @@
   {
     "id": 12,
     "category": "과학",
+    "difficulty": "medium",
     "question": "태양계에서 가장 큰 행성은 무엇일까요?",
     "options": ["토성", "지구", "해왕성", "목성"],
     "answer_index": 3,
@@ -98,6 +110,7 @@
   {
     "id": 13,
     "category": "과학",
+    "difficulty": "hard",
     "question": "진공에서 빛의 속도는 대략 얼마일까요?",
     "options": ["초속 약 30만 km", "초속 약 3만 km", "초속 약 300만 km", "초속 약 3,000 km"],
     "answer_index": 0,
@@ -106,6 +119,7 @@
   {
     "id": 14,
     "category": "과학",
+    "difficulty": "medium",
     "question": "사람의 혈액에서 산소를 운반하는 역할을 하는 세포는 무엇일까요?",
     "options": ["백혈구", "적혈구", "혈소판", "림프구"],
     "answer_index": 1,
@@ -114,6 +128,7 @@
   {
     "id": 15,
     "category": "과학",
+    "difficulty": "hard",
     "question": "원소 기호 'Fe'가 나타내는 원소는 무엇일까요?",
     "options": ["금", "은", "구리", "철"],
     "answer_index": 3,
@@ -122,6 +137,7 @@
   {
     "id": 16,
     "category": "과학",
+    "difficulty": "medium",
     "question": "식물이 빛 에너지를 이용해 이산화탄소와 물로 포도당을 만드는 과정을 무엇이라고 할까요?",
     "options": ["광합성", "호흡", "증산 작용", "발효"],
     "answer_index": 0,
@@ -130,6 +146,7 @@
   {
     "id": 17,
     "category": "과학",
+    "difficulty": "medium",
     "question": "만유인력의 법칙을 발표한 과학자는 누구일까요?",
     "options": ["알베르트 아인슈타인", "갈릴레오 갈릴레이", "아이작 뉴턴", "요하네스 케플러"],
     "answer_index": 2,
@@ -138,6 +155,7 @@
   {
     "id": 18,
     "category": "과학",
+    "difficulty": "easy",
     "question": "1기압에서 순수한 물이 끓는 온도는 몇 ℃일까요?",
     "options": ["90℃", "100℃", "110℃", "120℃"],
     "answer_index": 1,
@@ -146,6 +164,7 @@
   {
     "id": 19,
     "category": "과학",
+    "difficulty": "hard",
     "question": "1953년 DNA의 이중 나선 구조를 밝혀 발표한 과학자는 누구일까요?",
     "options": ["루이 파스퇴르", "그레고어 멘델", "찰스 다윈", "왓슨과 크릭"],
     "answer_index": 3,
@@ -154,6 +173,7 @@
   {
     "id": 20,
     "category": "과학",
+    "difficulty": "easy",
     "question": "다음 중 소리가 전달되지 않는 곳은 어디일까요?",
     "options": ["진공", "공기 중", "물속", "철 막대"],
     "answer_index": 0,
@@ -162,6 +182,7 @@
   {
     "id": 21,
     "category": "지리",
+    "difficulty": "easy",
     "question": "세계에서 국토 면적이 가장 넓은 나라는 어디일까요?",
     "options": ["캐나다", "중국", "미국", "러시아"],
     "answer_index": 3,
@@ -170,6 +191,7 @@
   {
     "id": 22,
     "category": "지리",
+    "difficulty": "medium",
     "question": "대한민국(남한)에서 가장 높은 산은 무엇일까요?",
     "options": ["한라산", "지리산", "설악산", "태백산"],
     "answer_index": 0,
@@ -178,6 +200,7 @@
   {
     "id": 23,
     "category": "지리",
+    "difficulty": "easy",
     "question": "세계에서 가장 높은 산은 무엇일까요?",
     "options": ["K2", "칸첸중가", "에베레스트산", "킬리만자로산"],
     "answer_index": 2,
@@ -186,6 +209,7 @@
   {
     "id": 24,
     "category": "지리",
+    "difficulty": "medium",
     "question": "오스트레일리아(호주)의 수도는 어디일까요?",
     "options": ["시드니", "캔버라", "멜버른", "퍼스"],
     "answer_index": 1,
@@ -194,6 +218,7 @@
   {
     "id": 25,
     "category": "지리",
+    "difficulty": "medium",
     "question": "세계에서 가장 넓은 대양은 무엇일까요?",
     "options": ["대서양", "인도양", "북극해", "태평양"],
     "answer_index": 3,
@@ -202,6 +227,7 @@
   {
     "id": 26,
     "category": "지리",
+    "difficulty": "hard",
     "question": "극지방을 제외하고 세계에서 가장 넓은 사막은 무엇일까요?",
     "options": ["사하라 사막", "고비 사막", "아라비아 사막", "칼라하리 사막"],
     "answer_index": 0,
@@ -210,6 +236,7 @@
   {
     "id": 27,
     "category": "지리",
+    "difficulty": "hard",
     "question": "남한 지역을 흐르는 강 가운데 가장 긴 강은 무엇일까요?",
     "options": ["한강", "금강", "낙동강", "영산강"],
     "answer_index": 2,
@@ -218,6 +245,7 @@
   {
     "id": 28,
     "category": "지리",
+    "difficulty": "easy",
     "question": "대한민국 영토의 가장 동쪽 끝에 있는 섬은 어디일까요?",
     "options": ["울릉도", "독도", "마라도", "제주도"],
     "answer_index": 1,
@@ -226,6 +254,7 @@
   {
     "id": 29,
     "category": "지리",
+    "difficulty": "medium",
     "question": "아마존 열대 우림이 가장 넓게 펼쳐져 있는 나라는 어디일까요?",
     "options": ["멕시코", "아르헨티나", "칠레", "브라질"],
     "answer_index": 3,
@@ -234,6 +263,7 @@
   {
     "id": 30,
     "category": "지리",
+    "difficulty": "hard",
     "question": "경도 0°의 기준선인 본초 자오선이 지나는 영국 런던의 지역은 어디일까요?",
     "options": ["그리니치", "웨스트민스터", "캠던", "첼시"],
     "answer_index": 0,
@@ -242,6 +272,7 @@
   {
     "id": 31,
     "category": "일반상식",
+    "difficulty": "easy",
     "question": "올림픽을 상징하는 오륜기에 그려진 고리는 모두 몇 개일까요?",
     "options": ["3개", "4개", "5개", "6개"],
     "answer_index": 2,
@@ -250,6 +281,7 @@
   {
     "id": 32,
     "category": "일반상식",
+    "difficulty": "medium",
     "question": "2월이 29일까지 있어 1년이 366일인 해를 무엇이라고 할까요?",
     "options": ["윤년", "평년", "안식년", "회년"],
     "answer_index": 0,
@@ -258,6 +290,7 @@
   {
     "id": 33,
     "category": "일반상식",
+    "difficulty": "hard",
     "question": "문화재 지정 번호 제도가 폐지되기 전, 대한민국 국보 제1호였던 문화재는 무엇일까요?",
     "options": ["석굴암", "흥인지문", "경복궁 근정전", "숭례문"],
     "answer_index": 3,
@@ -266,6 +299,7 @@
   {
     "id": 34,
     "category": "일반상식",
+    "difficulty": "hard",
     "question": "다음 중 셰익스피어의 4대 비극에 속하지 않는 작품은 무엇일까요?",
     "options": ["햄릿", "로미오와 줄리엣", "오셀로", "맥베스"],
     "answer_index": 1,
@@ -274,6 +308,7 @@
   {
     "id": 35,
     "category": "일반상식",
+    "difficulty": "easy",
     "question": "축구 경기에서 한 팀이 경기장에 내보낼 수 있는 선수는 골키퍼를 포함해 몇 명일까요?",
     "options": ["9명", "10명", "11명", "12명"],
     "answer_index": 2,
@@ -282,6 +317,7 @@
   {
     "id": 36,
     "category": "일반상식",
+    "difficulty": "hard",
     "question": "현행 대한민국 헌법에서 정한 대통령의 임기는 어떻게 될까요?",
     "options": ["4년 중임", "5년 단임", "6년 단임", "7년 단임"],
     "answer_index": 1,
@@ -290,6 +326,7 @@
   {
     "id": 37,
     "category": "일반상식",
+    "difficulty": "easy",
     "question": "명화 「모나리자」를 그린 화가는 누구일까요?",
     "options": ["레오나르도 다빈치", "라파엘로", "미켈란젤로", "렘브란트"],
     "answer_index": 0,
@@ -298,6 +335,7 @@
   {
     "id": 38,
     "category": "일반상식",
+    "difficulty": "medium",
     "question": "컴퓨터가 정보를 나타내는 가장 작은 단위로, 0 또는 1의 값을 가지는 것은 무엇일까요?",
     "options": ["바이트", "헤르츠", "워드", "비트"],
     "answer_index": 3,
@@ -306,6 +344,7 @@
   {
     "id": 39,
     "category": "일반상식",
+    "difficulty": "medium",
     "question": "훈민정음 반포를 기념하는 한글날은 몇 월 며칠일까요?",
     "options": ["10월 3일", "8월 15일", "10월 9일", "3월 1일"],
     "answer_index": 2,
@@ -314,6 +353,7 @@
   {
     "id": 40,
     "category": "일반상식",
+    "difficulty": "medium",
     "question": "노벨상을 만든 알프레드 노벨이 발명한 것은 무엇일까요?",
     "options": ["다이너마이트", "전화기", "전구", "증기 기관"],
     "answer_index": 0,

@@ -4,12 +4,18 @@ import { leaderboardHref, quizHref } from "@/lib/routes";
 
 describe("quizHref", () => {
   it.each([null, undefined, ""])("slug가 %j이면 전체 모드", (slug) => {
-    expect(quizHref(slug)).toBe("/quiz?mode=all");
+    expect(quizHref({ categorySlug: slug })).toBe("/quiz?mode=all");
+    expect(quizHref()).toBe("/quiz?mode=all");
+  });
+
+  it("SPEED 모드는 스피드 퀴즈, slug가 있으면 mode와 상관없이 카테고리", () => {
+    expect(quizHref({ mode: "SPEED" })).toBe("/quiz?mode=speed");
+    expect(quizHref({ mode: "SPEED", categorySlug: "science" })).toBe("/quiz?category=science");
   });
 
   it("slug의 특수문자는 URL 인코딩한다 (쿼리 주입 방지)", () => {
-    expect(quizHref("a b&mode=all")).toBe("/quiz?category=a%20b%26mode%3Dall");
-    expect(quizHref("한국사")).toBe(`/quiz?category=${encodeURIComponent("한국사")}`);
+    expect(quizHref({ categorySlug: "a b&mode=all" })).toBe("/quiz?category=a%20b%26mode%3Dall");
+    expect(quizHref({ categorySlug: "한국사" })).toBe(`/quiz?category=${encodeURIComponent("한국사")}`);
   });
 });
 
@@ -23,6 +29,11 @@ describe("leaderboardHref", () => {
     expect(leaderboardHref({ categorySlug: "science", limit: 50, highlight: 3 })).toBe(
       "/leaderboard?mode=CATEGORY&category=science&limit=50&highlight=3",
     );
+  });
+
+  it("스피드 순위표는 mode=SPEED (ALL은 기본이라 생략)", () => {
+    expect(leaderboardHref({ mode: "SPEED", highlight: 2 })).toBe("/leaderboard?mode=SPEED&highlight=2");
+    expect(leaderboardHref({ mode: "ALL" })).toBe("/leaderboard");
   });
 
   it("강조 순위 0은 의미가 없으므로 붙이지 않는다", () => {

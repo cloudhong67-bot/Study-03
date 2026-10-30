@@ -1,4 +1,4 @@
-export type OptionState = "idle" | "pending" | "correct" | "wrong" | "dimmed";
+export type OptionState = "idle" | "pending" | "correct" | "wrong" | "dimmed" | "removed";
 
 interface OptionButtonProps {
   index: number;
@@ -17,6 +17,8 @@ const STATE_CLASS: Record<OptionState, string> = {
   wrong:
     "border-rose-500 bg-rose-50 text-rose-900 ring-2 ring-rose-500/30 motion-safe:animate-shake dark:bg-rose-950/50 dark:text-rose-100",
   dimmed: "border-border bg-surface opacity-55",
+  // 50:50 힌트로 지운 오답
+  removed: "border-dashed border-border bg-surface text-muted line-through opacity-40",
 };
 
 const BADGE_CLASS: Record<OptionState, string> = {
@@ -25,9 +27,15 @@ const BADGE_CLASS: Record<OptionState, string> = {
   correct: "bg-emerald-500 text-white",
   wrong: "bg-rose-500 text-white",
   dimmed: "bg-border text-muted",
+  removed: "bg-border text-muted",
 };
 
-const STATE_LABEL: Partial<Record<OptionState, string>> = { pending: "채점 중", correct: "정답", wrong: "선택한 오답" };
+const STATE_LABEL: Partial<Record<OptionState, string>> = {
+  pending: "채점 중",
+  correct: "정답",
+  wrong: "선택한 오답",
+  removed: "힌트로 제외",
+};
 
 export function OptionButton({ index, label, state, disabled, onSelect }: OptionButtonProps) {
   const stateLabel = STATE_LABEL[state];
@@ -35,7 +43,7 @@ export function OptionButton({ index, label, state, disabled, onSelect }: Option
     <button
       type="button"
       onClick={() => onSelect(index)}
-      disabled={disabled}
+      disabled={disabled || state === "removed"}
       aria-label={`${index + 1}번. ${label}${stateLabel ? ` (${stateLabel})` : ""}`}
       className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-base transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-default ${STATE_CLASS[state]}`}
     >

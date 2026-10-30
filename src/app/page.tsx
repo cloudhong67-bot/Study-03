@@ -23,7 +23,7 @@ export default async function Home() {
 
       <ul className="grid grid-cols-3 gap-2 text-center text-xs text-muted">
         <li className="rounded-2xl bg-surface p-3">
-          <strong className="block text-base text-foreground">10점</strong>문제당 점수
+          <strong className="block text-base text-foreground">10~20점</strong>난이도별 + 보너스
         </li>
         <li className="rounded-2xl bg-surface p-3">
           <strong className="block text-base text-foreground">즉시</strong>정답·해설 확인

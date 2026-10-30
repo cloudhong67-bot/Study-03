@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createSessionSchema,
   leaderboardQuerySchema,
+  questionRefSchema,
   submitAnswerSchema,
   submitScoreSchema,
 } from "@/lib/validation";
@@ -19,8 +20,21 @@ describe("createSessionSchema", () => {
     });
   });
 
+  it("SPEED 모드는 categorySlug 없이 통과한다", () => {
+    expect(createSessionSchema.parse({ mode: "SPEED", categorySlug: "science" })).toEqual({ mode: "SPEED" });
+  });
+
   it("알 수 없는 mode는 거부한다", () => {
     expect(createSessionSchema.safeParse({ mode: "RANDOM" }).success).toBe(false);
+  });
+});
+
+describe("questionRefSchema (문제 열기·힌트)", () => {
+  it("양의 정수 questionId만 통과한다", () => {
+    expect(questionRefSchema.parse({ questionId: 3 })).toEqual({ questionId: 3 });
+    for (const questionId of [0, -1, 1.5, "3", null, undefined, Number.NaN]) {
+      expect(questionRefSchema.safeParse({ questionId }).success).toBe(false);
+    }
   });
 });
 
@@ -106,7 +120,12 @@ describe("leaderboardQuerySchema", () => {
     );
   });
 
-  it("ALL 모드에서는 category를 무시한다", () => {
+  it("ALL·SPEED 모드에서는 category를 무시한다", () => {
     expect(leaderboardQuerySchema.parse({ mode: "ALL", category: "science" }).category).toBeUndefined();
+    expect(leaderboardQuerySchema.parse({ mode: "SPEED", category: "science" })).toEqual({
+      mode: "SPEED",
+      category: undefined,
+      limit: 10,
+    });
   });
 });

@@ -12,6 +12,13 @@ const CATEGORIES = [
   { slug: "general", name: "일반상식", sortOrder: 4 },
 ];
 
+// questions.json의 difficulty → DB enum (점수 배수는 src/lib/scoring.ts)
+const DIFFICULTIES = new Map([
+  ["easy", "EASY"],
+  ["medium", "MEDIUM"],
+  ["hard", "HARD"],
+]);
+
 async function loadQuestions() {
   const url = new URL("./data/questions.json", import.meta.url);
   return JSON.parse(await readFile(url, "utf8"));
@@ -44,6 +51,9 @@ function validateQuestions(questions) {
       errors.push(`${at}: options는 비어 있지 않은 문자열 4개여야 합니다.`);
     } else if (new Set(q.options).size !== 4) {
       errors.push(`${at}: options에 중복된 보기가 있습니다.`);
+    }
+    if (!DIFFICULTIES.has(q.difficulty)) {
+      errors.push(`${at}: difficulty는 easy, medium, hard 중 하나여야 합니다.`);
     }
     if (!Number.isInteger(q.answer_index) || q.answer_index < 0 || q.answer_index > 3) {
       errors.push(`${at}: answer_index는 0~3 정수여야 합니다.`);
@@ -80,6 +90,7 @@ async function main() {
             options: q.options,
             answerIndex: q.answer_index,
             explanation: q.explanation,
+            difficulty: DIFFICULTIES.get(q.difficulty),
           };
           await tx.question.upsert({
             where: { id: q.id },

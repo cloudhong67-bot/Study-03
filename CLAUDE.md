@@ -225,3 +225,15 @@ The PRD lists these as future work. Design the code so they can be added later:
 - Time-attack mode with a per-question timer (for example 15s)
 - Hint items, such as a 50:50 option
 - More categories (대중문화 pop culture, IT, 세계사 world history), so don't hardcode the list of four categories
+
+## 퀴즈 문제 교차 검증 가이드라인
+1. 모든 문제 작성 시 확인 사항
+	- 다른 해석 가능 시 조건 명시(예: 면적 기준, 2024년 기준)
+2. 최상급 표현에 기준이 있는가?
+	- '가장 큰', '최초의' 등 표현에 측정 기준 명시
+3. 시간과 범위가 명확한가?
+	- 변할 수 있는 정보는 시점 명시
+	- 지리적, 분류적 범위 한정
+4.교차 검증했는가?
+	- 의심스러운 정보는 2개 이상 출처 확인
+	- 논란 있는 내용은 주류 학설 기준 

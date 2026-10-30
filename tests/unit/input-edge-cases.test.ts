@@ -95,6 +95,7 @@ describe("leaderboardQuerySchema: 쿼리 문자열 극단", () => {
     expect(leaderboardQuerySchema.parse({ foo: "bar", highlight: "3" })).toEqual({
       mode: "ALL",
       category: undefined,
+      period: "all",
       limit: 10,
     });
   });

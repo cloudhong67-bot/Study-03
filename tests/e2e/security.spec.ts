@@ -44,6 +44,28 @@ test("CSP를 적용해도 화면이 정상 동작하고 위반이 하나도 없�
   await page.goto("/leaderboard");
   await expect(page.getByRole("heading", { name: /Top 10/ })).toBeVisible();
   expect(await violations()).toEqual([]);
+
+  // 내 기록 화면의 정답률 막대는 style 속성으로 폭을 정한다. 세션을 새로 만들지 않도록 저장된 기록을 넣고 연다.
+  await page.evaluate(() => {
+    const game = {
+      sessionId: "csp-check",
+      mode: "CATEGORY",
+      category: "과학",
+      categorySlug: "science",
+      score: 100,
+      maxScore: 217,
+      correctCount: 5,
+      totalCount: 10,
+      maxStreak: 3,
+      timedOutCount: 0,
+      byCategory: [{ category: "과학", correct: 5, total: 10 }],
+      playedAt: "2026-10-30T03:00:00.000Z",
+    };
+    localStorage.setItem("trivia:history", JSON.stringify({ version: 1, games: [game] }));
+  });
+  await page.goto("/records");
+  await expect(page.getByRole("meter", { name: "과학 정답률" })).toHaveAttribute("aria-valuenow", "50");
+  expect(await violations()).toEqual([]);
   expect(consoleErrors.filter((e) => /Content Security Policy|Refused to/i.test(e))).toEqual([]);
 });
 

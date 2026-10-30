@@ -5,8 +5,9 @@ import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { ResultSummary } from "@/components/ResultSummary";
 import { orNotFound } from "@/lib/page-helpers";
 import { getResult } from "@/lib/quiz/sessions";
-import { leaderboardHref, quizHref } from "@/lib/routes";
+import { leaderboardHref, quizHref, RECORDS_HREF } from "@/lib/routes";
 import { sessionIdSchema } from "@/lib/validation";
+import { SaveLocalResult } from "./SaveLocalResult";
 import { ScoreSubmitForm } from "./ScoreSubmitForm";
 
 export const metadata: Metadata = { title: "결과 | 지식와 도전" };
@@ -35,6 +36,25 @@ export default async function ResultPage({ params }: { params: Promise<{ session
       <ResultSummary result={result} />
 
       {result.completed && (
+        <SaveLocalResult
+          sessionId={sessionId}
+          result={{
+            mode: result.mode,
+            category: result.category,
+            categorySlug: result.categorySlug,
+            completed: result.completed,
+            score: result.score,
+            maxScore: result.maxScore,
+            correctCount: result.correctCount,
+            totalCount: result.totalCount,
+            maxStreak: result.maxStreak,
+            timedOutCount: result.timedOutCount,
+            byCategory: result.byCategory,
+          }}
+        />
+      )}
+
+      {result.completed && (
         <ScoreSubmitForm
           sessionId={sessionId}
           submitted={result.submitted}
@@ -51,6 +71,16 @@ export default async function ResultPage({ params }: { params: Promise<{ session
           🏆 순위 보기
         </Link>
       </div>
+
+      {result.completed && (
+        <p className="text-center text-sm text-muted">
+          이 결과는 이 기기의{" "}
+          <Link href={RECORDS_HREF} className="font-semibold text-indigo-600 underline dark:text-indigo-400">
+            📊 내 기록
+          </Link>
+          에 자동으로 저장돼요.
+        </p>
+      )}
     </div>
   );
 }

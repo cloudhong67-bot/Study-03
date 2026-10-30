@@ -5,4 +5,7 @@ const base =
 
 export const primaryButton = `${base} bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700`;
 
+/** 되돌릴 수 없는 동작(기록 지우기 등)의 확인 버튼 */
+export const dangerButton = `${base} bg-rose-600 text-white shadow-sm hover:bg-rose-500 active:bg-rose-700`;
+
 export const secondaryButton = `${base} border border-border bg-surface text-foreground hover:border-indigo-300 hover:bg-indigo-50 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40`;

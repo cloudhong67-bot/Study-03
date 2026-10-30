@@ -42,6 +42,8 @@
 * **순위 기록:**
 * 닉네임 입력 후 최종 점수를 리더보드(순위표)에 등록.
 * 전체 사용자 상위 랭킹(Top 10/Top 50) 조회 기능.
+* 기간별 순위표: 전체 기간 / 주간(이번 주 월요일 0시부터) / 일일(오늘 0시부터). 기준 시간대는 한국 시간이고, 기간 안의 기록만으로 1위부터 다시 매긴다.
+* **내 기록:** 끝까지 푼 게임의 결과는 이 브라우저(localStorage)에 자동 저장한다. 최근 100판의 기록과 누적 통계(모드별 플레이 수·최고·평균 점수, 카테고리별 정답률·최고 점수)를 보여 주며, 순위표와는 별개다.
 
 ## 3. 사용자 흐름 (User Flow)
 
@@ -129,6 +131,8 @@
 * **50:50 힌트:** 서버가 정답이 아닌 보기 2개를 무작위로 골라 `session_question_views.hint_removed`에 저장하고, 답안에 `hint_used`를 복사해 둔다. 한 문제에 다시 요청하면 처음 고른 보기를 돌려준다(멱등). 답한 뒤에는 `409`. 힌트 수에는 제한이 없고, 쓸 때마다 그 문제의 +2점을 포기한다.
 * **서버 채점:** 문제를 받을 때 클라이언트에는 `answer_index`를 보내지 않는다. 답을 선택할 때마다 서버가 정답 여부, 정답, 해설을 돌려준다. 최종 점수도 서버가 세션 기록으로 계산하므로 클라이언트가 점수를 조작할 수 없다.
 * **리더보드 분리:** 만점이 다르기 때문에 모드별(전체 40문제 / 카테고리별 / 스피드)로 순위를 따로 집계한다. 동점이면 먼저 기록한 사람이 위에 온다.
+* **기간별 순위표:** 주간·일일은 `scores.created_at`이 기간 시작 시각(한국 시간 이번 주 월요일 0시 / 오늘 0시, `src/lib/leaderboard-period.ts`) 이후인 기록만 집계한다. 등록 시각은 다른 시간 검사처럼 DB 기본값이 아니라 앱 시계로 쓴다. 등록 응답의 순위(`rank`)와 순위표 강조(`highlight`)는 전체 기간 기준이다.
+* **내 기록(클라이언트 전용):** `LocalDataManager`(`src/lib/data-manager.ts`)가 localStorage `trivia:history`에 최근 100판과 누적 통계를 저장한다. 서버는 이 값을 받지도 믿지도 않으며, 순위표는 항상 서버가 채점한 점수만 쓴다. 저장값은 다른 코드나 사용자가 바꿀 수 있으므로 읽을 때 하나하나 검증하고, 통계가 깨졌으면 남은 기록으로 다시 계산한다.
 * **닉네임:** 2~12자, 로그인은 없다. NFC로 정규화하고 앞뒤 공백을 제거한 뒤 글자 수를 센다. 순위표 사칭을 막기 위해 제어·서식 문자(방향 전환 U+202E, 폭 없는 공백 U+200B 등)와 빈 글자(한글 채움 문자 U+3164·U+115F·U+1160·U+FFA0, 점자 빈칸 U+2800)는 거부한다. 단, 이모지를 잇는 ZWJ(👨‍👩‍👧)는 허용한다.
 * **보안 헤더:** 모든 응답에 CSP(`frame-ancestors 'none'`, 같은 출처만 허용), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`을 붙이고 `X-Powered-By`는 끈다(`next.config.ts`). App Router 하이드레이션 때문에 script-src에는 `'unsafe-inline'`이 필요하다(nonce 방식 CSP는 이후 과제).
 * **요청 횟수 제한(앱 내부, `src/lib/rate-limit.ts`):** IP별 고정 윈도 카운터를 Postgres(`rate_limits`)에 둔다. 여러 replica가 같은 한도를 공유하고 재시작해도 유지된다. 한도는 세션 생성 10분 30회, 문제 열기·힌트·답안 각각 1분 300회, 점수 등록 1시간 20회이며, 넘으면 `429`와 `Retry-After`를 돌려준다. 학교처럼 여러 사람이 공인 IP 하나를 쓰는 환경을 고려해 넉넉하게 잡았다. IPv6는 /64 단위로 묶는다.
@@ -153,12 +157,13 @@
 ├─ src/
 │  ├─ app/
 │  │  ├─ layout.tsx
-│  │  ├─ page.tsx, MainMenu.tsx            # 메인: [게임 시작] / [카테고리 선택] / [순위 보기]
+│  │  ├─ page.tsx, MainMenu.tsx            # 메인: [게임 시작] / [카테고리 선택] / [순위 보기] / [내 기록]
 │  │  ├─ error.tsx, not-found.tsx          # 공통 오류 / 404 화면
 │  │  ├─ quiz/                             # page.tsx(?mode=all | ?mode=speed | ?category=<slug>), QuizRunner.tsx(화면),
 │  │  │                                    # quiz-state.ts(상태 전이), use-quiz-session.ts(서버 통신·진행)
-│  │  ├─ result/[sessionId]/               # page.tsx(결과 요약) + ScoreSubmitForm.tsx(닉네임 제출)
-│  │  ├─ leaderboard/page.tsx              # ?mode=ALL|CATEGORY|SPEED&category=<slug>&limit=10|50&highlight=<rank>
+│  │  ├─ result/[sessionId]/               # page.tsx(결과 요약) + ScoreSubmitForm.tsx(닉네임 제출) + SaveLocalResult.tsx(내 기록 자동 저장)
+│  │  ├─ leaderboard/page.tsx              # ?mode=ALL|CATEGORY|SPEED&category=<slug>&period=all|weekly|daily&limit=10|50&highlight=<rank>
+│  │  ├─ records/                          # 내 기록: page.tsx + RecordsView.tsx (localStorage, 클라이언트 전용)
 │  │  └─ api/
 │  │     ├─ categories/route.ts            # GET
 │  │     ├─ sessions/route.ts              # POST  세션 생성
@@ -187,6 +192,9 @@
 │     ├─ hint.ts                           # 50:50 힌트로 지울 보기 고르기
 │     ├─ routes.ts                         # 화면 이동 URL·카테고리 아이콘
 │     ├─ sound.ts                          # 정/오답 효과음 (Web Audio 합성, 음원 파일 없음)
+│     ├─ leaderboard-period.ts             # 주간·일일 순위표의 시작 시각 (한국 시간 달력)
+│     ├─ data-manager.ts                   # LocalDataManager: 내 게임 기록(최근 100판)·통계 (localStorage)
+│     ├─ use-local-history.ts              # 내 기록 구독 훅 (useSyncExternalStore)
 │     └─ validation.ts                     # zod 스키마 (요청 본문·쿼리)
 ├─ prisma/
 │  ├─ schema.prisma
@@ -372,7 +380,7 @@ model RateLimit {
 | POST | `/api/sessions/:id/answers` | `{ questionId, selectedIndex: 0~3 | null }` | `200` `{ isCorrect, timedOut, answerIndex, explanation, points: { base, time, hint, combo, total }, streak, score }`. `points`는 이 문제에서 얻은 점수(오답·시간 초과면 모두 0), `streak`은 이 답안까지의 연속 정답 수, `score`는 지금까지의 총점이다. `null`은 스피드 퀴즈의 시간 초과이며 다른 모드에서는 `400`. 열지 않은 문제는 `409`. 이미 답한 문제에 **같은 보기**를 다시 보내면 처음과 같은 `200`(재전송), 다른 보기면 `409`, 세션에 없는 문제는 `400`, 직전 답안 후 1초가 안 됐으면 `429`, 만료된 세션(24시간)은 `404`. 마지막 답이 들어오면 `completed_at`을 기록한다 |
 | GET | `/api/sessions/:id/result` | - | `200` `{ mode, category, categorySlug, completed, submitted, timedOutCount, score, maxScore, breakdown: { base, time, hint, combo }, maxStreak, correctCount, answeredCount, totalCount, accuracy, byCategory: [{ category, correct, total }] }`. `category`(이름)와 `categorySlug`는 카테고리 모드일 때만 값이 있고 아니면 `null`, `accuracy`는 % 단위로 소수점 첫째 자리까지, 답하지 않은 문제는 오답으로 센다 |
 | POST | `/api/sessions/:id/submit` | `{ username }` (앞뒤 공백 제거, 2~12자) | `201` `{ rank, score, maxScore }`. 점수는 서버가 답안 기록으로 계산한다. 이미 등록한 세션에 **같은 닉네임**을 다시 보내면 처음 결과를 `200`으로(재전송), 다른 닉네임이면 `409`. 모든 문제에 답하기 전이면 `409`, 만료된 세션은 `404` |
-| GET | `/api/leaderboard` | `?mode=ALL|CATEGORY|SPEED&category=<slug>&limit=10|50` (기본값 `ALL`, `10`) | `200` `[{ rank, username, score, maxScore, created_at }]`. 정렬은 score 내림차순 → created_at 오름차순(선착순)이다. `CATEGORY`인데 category가 없으면 `400`, `ALL`·`SPEED`면 category를 무시한다 |
+| GET | `/api/leaderboard` | `?mode=ALL|CATEGORY|SPEED&category=<slug>&period=all|weekly|daily&limit=10|50` (기본값 `ALL`, `all`, `10`) | `200` `[{ rank, username, score, maxScore, created_at }]`. 정렬은 score 내림차순 → created_at 오름차순(선착순)이다. `weekly`·`daily`는 한국 시간 이번 주 월요일 0시·오늘 0시 이후 기록만 모아 1위부터 다시 매긴다. `CATEGORY`인데 category가 없거나 period가 허용값이 아니면 `400`, `ALL`·`SPEED`면 category를 무시한다 |
 | GET | `/api/health` | - | `200` `{ status: "ok" }` / DB 연결 실패 시 `503` `{ status: "error", database: "unreachable" }`, 3초 안에 답이 없으면 `503` `{ ..., database: "timeout" }` |
 
 **사용자 흐름과 매핑:** 메인(`/api/categories`) → 퀴즈 시작(`POST /api/sessions`) → 문제마다 열기(`POST .../views`), 필요하면 힌트(`POST .../hints`), 답안 제출과 피드백(`POST .../answers`) → 결과(`GET .../result`) → 닉네임 제출(`POST .../submit`) → 순위(`GET /api/leaderboard`) → 재도전 시 다시 세션 생성.
@@ -416,7 +424,8 @@ docker compose up -d db          # 개발 서버(npm run dev)용 DB만 띄울 �
 * `tests/e2e/quiz-flow.spec.ts`:
   * 핵심 흐름: 메인 → 카테고리 10문제(문제마다 피드백 검증) → 결과 점수 확인 → 닉네임 등록 → 순위표 강조 행 → 결과 재방문 시 "이미 등록" 표시
   * 전체 모드 시작과 키보드(1~4, Enter) 조작
-  * 순위표 탭·Top 50 전환과 재도전
+  * 순위표 탭·기간(전체/주간/일일)·Top 50 전환과 재도전
+  * 결과의 내 기록 자동 저장(재방문해도 한 번만 셈)과 기록 지우기
   * 404 화면
 * `tests/e2e/security.spec.ts`: 실제 응답의 보안 헤더, CSP를 적용한 상태로 퀴즈를 진행할 때 위반이 0건인지(하이드레이션·클릭·키보드 동작), 다른 출처의 iframe 삽입 차단, 4KB 초과 본문 413
 * 정리(global teardown): 로컬 대상일 때만(`E2E_BASE_URL` 미지정) 이번 실행이 만든 세션과 `E2E-` 닉네임 기록을 지운다. 기록이 쌓이면 새 기록이 Top 50 밖으로 밀려나 테스트가 불안정해지기 때문이다.

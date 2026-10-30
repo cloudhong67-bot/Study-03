@@ -44,3 +44,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# /quiz-daily backups (questions snapshots + local DB dump)
+/backups/

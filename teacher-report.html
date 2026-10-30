@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>「지식와 도전」 반 성적 보고서 — 선생님 전용</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #dddcd6;
+    --grid: #e8e7e2;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77756f;
+    --series-1: #2a78d6;
+    --track: #ecebe6;
+    --warn-bg: #fff4e0;
+    --warn-text: #7a4b00;
+    --critical: #c62f2e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #34332f;
+      --grid: #2a2a27;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #9a998f;
+      --series-1: #3987e5;
+      --track: #2a2a27;
+      --warn-bg: #3a2a0c;
+      --warn-text: #f3c977;
+      --critical: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .meta { color: var(--text-secondary); font-size: 0.9rem; margin: 0; }
+  .banner {
+    margin: 16px 0 0; padding: 10px 14px; border-radius: 8px;
+    background: var(--warn-bg); color: var(--warn-text); font-size: 0.9rem;
+  }
+  nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 18px 0 0; font-size: 0.9rem; }
+  nav a { color: var(--series-1); text-decoration: none; }
+  nav a:hover { text-decoration: underline; }
+  section {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-top: 18px;
+  }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; }
+  h3 { font-size: 0.98rem; margin: 18px 0 8px; color: var(--text-secondary); }
+  p, li { color: var(--text-primary); }
+  .note { color: var(--text-muted); font-size: 0.85rem; margin: 6px 0 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .tile { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--text-secondary); font-size: 0.82rem; }
+  .tile .value { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tile .sub { color: var(--text-muted); font-size: 0.8rem; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 600; background: var(--surface-1); }
+  td.num, th.num { text-align: right; }
+  td.wrap { white-space: normal; min-width: 220px; }
+  .flag { color: var(--critical); font-weight: 600; }
+  /* 카테고리별 정답률 막대 (단일 계열) */
+  .bars { display: grid; gap: 10px; margin-top: 4px; }
+  .bar-row { display: grid; grid-template-columns: 72px 1fr 120px; align-items: center; gap: 10px; position: relative; }
+  .bar-row .name { color: var(--text-secondary); font-size: 0.88rem; }
+  .bar-track { height: 14px; background: var(--track); border-radius: 4px; position: relative; }
+  .bar-fill { height: 100%; background: var(--series-1); border-radius: 4px; }
+  .bar-row .val { font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+  .bar-row .val small { color: var(--text-muted); }
+  .bar-row:hover .bar-track { outline: 2px solid var(--border); outline-offset: 2px; }
+  .tip {
+    position: absolute; right: 130px; top: -30px; z-index: 2; pointer-events: none;
+    background: var(--text-primary); color: var(--surface-1); font-size: 0.8rem;
+    padding: 4px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; white-space: nowrap;
+  }
+  .bar-row:hover .tip, .bar-row:focus-within .tip, .bar-row:focus .tip { opacity: 1; }
+  .bar-row:focus { outline: none; }
+  ul.compact { margin: 6px 0 0; padding-left: 20px; }
+  ul.compact li { margin: 3px 0; }
+  .toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .toggle button {
+    font: inherit; font-size: 0.85rem; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+  }
+  .toggle button[aria-pressed="true"] { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  @media print {
+    body { background: #fff; }
+    section { break-inside: avoid; border-color: #ccc; }
+    nav, .toggle { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>「지식와 도전」 반 성적 보고서 — 전체 학생</h1>
+    <p class="meta">DB <code>127.0.0.1:5433/trivia</code> · 기간 전체(all) · 만든 시각 2026-10-30 15:16 (한국 시간) · 학생 3명 · 기록 6개 · 답안 120개</p>
+    <p class="banner">선생님 전용 자료입니다. 학생 닉네임·성적과 퀴즈 정답이 들어 있으니 학생에게 보여 주거나 공유·커밋하지 마세요. 점수를 등록한 게임만 집계했고, 학생은 닉네임으로만 구분합니다.</p>
+    <nav aria-label="목차">
+      <a href="#glance">한눈에 보기</a><a href="#roster">학생 명단</a><a href="#weakness">취약 영역</a>
+      <a href="#compare">상하위 비교</a><a href="#students">학생별 요약</a><a href="#suggest">수업 제안</a><a href="#steps">실행 결과</a>
+    </nav>
+  </header>
+
+  <section id="glance" aria-labelledby="h-glance">
+    <h2 id="h-glance">한눈에 보기</h2>
+    <div class="tiles">
+      <div class="tile"><div class="label">반 평균 득점률</div><div class="value">78.6%</div><div class="sub">중앙값 96.5%</div></div>
+      <div class="tile"><div class="label">반 정답률</div><div class="value">95.0%</div><div class="sub">답안 120개</div></div>
+      <div class="tile"><div class="label">가장 약한 카테고리</div><div class="value">한국사</div><div class="sub">86.4% · 새 문제만 50%</div></div>
+      <div class="tile"><div class="label">도움이 필요한 학생</div><div class="value">0명</div><div class="sub">기준상 · 상식 저조는 평균보다 39.4%p 낮음</div></div>
+    </div>
+    <ul class="compact">
+      <li>강한 카테고리: 과학·지리·일반상식 모두 100%로 같습니다.</li>
+      <li>가장 어려워한 문제: 기준(답안 5개 이상)을 채운 문제가 없습니다. 새 한국사 #2·#5·#7·#8·#9는 답안 1개씩이고 모두 틀렸습니다.</li>
+    </ul>
+  </section>
+
+  <section id="roster" aria-labelledby="h-roster">
+    <h2 id="h-roster">학생 명단</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="num">#</th><th>닉네임</th><th>기록(전체/카테고리/스피드)</th><th class="num">평균 득점률</th>
+          <th>최고 득점률(모드)</th><th class="num">정답률</th><th class="num">힌트</th><th class="num">평균 응답</th>
+          <th>가장 약한 카테고리</th><th>마지막 기록</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>상식 왕</td><td>1 (0/0/1)</td><td class="num">100%</td><td>100% (스피드)</td><td class="num">100%</td><td class="num">0%</td><td class="num">2.4초</td><td>—</td><td>10-30 14:31</td></tr>
+          <tr><td class="num">2</td><td>퀴즈 왕</td><td>4 (1/1/2)</td><td class="num">96.5%</td><td>100% (전체 도전)</td><td class="num">98.9%</td><td class="num">0%</td><td class="num">2.8초</td><td>한국사 96.7%</td><td>10-30 14:00</td></tr>
+          <tr><td class="num">3</td><td>상식 저조</td><td>1 (0/1/0)</td><td class="num">39.2%</td><td>39.2% (카테고리·한국사)</td><td class="num">50.0%</td><td class="num">0%</td><td class="num">5.5초</td><td>한국사 50.0%</td><td>10-30 15:09</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>눈여겨볼 학생</h3>
+    <ul class="compact">
+      <li><span class="flag">상식 저조</span>: 평균 득점률이 반 평균보다 39.4%p 낮고, 기록이 1개뿐입니다.</li>
+      <li>상식 왕: 기록이 1개뿐입니다(스피드 1판).</li>
+    </ul>
+  </section>
+
+  <section id="weakness" aria-labelledby="h-weak">
+    <h2 id="h-weak">취약 영역</h2>
+    <p class="note">교체 전 한국사 문제(2026-10-30 15:03 <code>/quiz-daily</code>)의 답안 34개를 빼고 답안 86개로 집계했습니다.</p>
+
+    <h3>카테고리별 정답률</h3>
+    <div class="toggle" role="group" aria-label="보기 전환">
+      <button type="button" aria-pressed="true" data-view="chart">막대</button>
+      <button type="button" aria-pressed="false" data-view="table">표</button>
+    </div>
+    <div data-panel="chart">
+      <div class="bars" role="list">
+        <div class="bar-row" role="listitem" tabindex="0" aria-label="한국사 정답률 50.0%, 답안 10개, 1명">
+          <span class="name">한국사</span>
+          <div class="bar-track"><div class="bar-fill" style="width:50%"></div></div>
+          <span class="val">50.0% <small>· 10개</small></span>
+          <span class="tip">한국사 · 정답률 50.0% · 답안 10개 · 1명 · 평균 5.5초</span>
+        </div>
+        <div class="bar-row" role="listitem" tabindex="0" aria-label="지리 정답률 100%, 답안 27개, 2명">
+          <span class="name">지리</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <span class="val">100% <small>· 27개</small></span>
+          <span class="tip">지리 · 정답률 100% · 답안 27개 · 2명 · 평균 2.7초</span>
+        </div>
+        <div class="bar-row" role="listitem" tabindex="0" aria-label="일반상식 정답률 100%, 답안 26개, 2명">
+          <span class="name">일반상식</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <span class="val">100% <small>· 26개</small></span>
+          <span class="tip">일반상식 · 정답률 100% · 답안 26개 · 2명 · 평균 2.4초</span>
+        </div>
+        <div class="bar-row" role="listitem" tabindex="0" aria-label="과학 정답률 100%, 답안 23개, 2명">
+          <span class="name">과학</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <span class="val">100% <small>· 23개</small></span>
+          <span class="tip">과학 · 정답률 100% · 답안 23개 · 2명 · 평균 2.7초</span>
+        </div>
+      </div>
+    </div>
+    <div data-panel="table" hidden>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>카테고리</th><th class="num">답한 학생</th><th class="num">답안</th><th class="num">정답률</th><th class="num">힌트</th><th class="num">평균 응답</th><th class="num">시간 초과</th></tr></thead>
+          <tbody>
+            <tr><td>한국사</td><td class="num">1</td><td class="num">10</td><td class="num">50.0%</td><td class="num">0%</td><td class="num">5.5초</td><td class="num">0</td></tr>
+            <tr><td>지리</td><td class="num">2</td><td class="num">27</td><td class="num">100%</td><td class="num">0%</td><td class="num">2.7초</td><td class="num">0</td></tr>
+            <tr><td>일반상식</td><td class="num">2</td><td class="num">26</td><td class="num">100%</td><td class="num">0%</td><td class="num">2.4초</td><td class="num">0</td></tr>
+            <tr><td>과학</td><td class="num">2</td><td class="num">23</td><td class="num">100%</td><td class="num">0%</td><td class="num">2.7초</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>난이도별</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>난이도</th><th class="num">답안</th><th class="num">정답률</th></tr></thead>
+        <tbody>
+          <tr><td>EASY</td><td class="num">25</td><td class="num">100%</td></tr>
+          <tr><td>MEDIUM</td><td class="num">31</td><td class="num">93.5%</td></tr>
+          <tr><td>HARD</td><td class="num">30</td><td class="num">90.0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">HARD 정답률 90%는 어긋남 기준(90% 이상)에 걸립니다. 답안 대부분이 퀴즈 왕 한 명의 것이라 결론은 보류합니다.</p>
+
+    <h3>어려워한 문제 (참고: 답안 1개씩, 표본 부족)</h3>
+    <p class="note">답안 5개 이상인 문제가 없어 정식 표는 없습니다. 아래는 정답이 나오는 선생님용 자료입니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="num">id</th><th>난이도</th><th>질문(요약)</th><th>고른 오답</th><th>정답</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2</td><td>MEDIUM</td><td class="wrap">고려 무신 정권 시기에 조직되어 몽골의 침입에 맞서…</td><td>별무반</td><td>삼별초</td></tr>
+          <tr><td class="num">5</td><td>HARD</td><td class="wrap">통일 신라의 장보고가 828년 해상 무역과 해적 소탕의…</td><td>진도</td><td>완도</td></tr>
+          <tr><td class="num">7</td><td>MEDIUM</td><td class="wrap">1876년 조선이 일본과 맺은 조약으로, 우리나라 최초…</td><td>을사늑약</td><td>강화도 조약</td></tr>
+          <tr><td class="num">8</td><td>HARD</td><td class="wrap">1907년 나랏빚을 갚아 국권을 지키자며 국채 보상 운…</td><td>서울</td><td>대구</td></tr>
+          <tr><td class="num">9</td><td>HARD</td><td class="wrap">고려 광종이 958년 후주 출신 쌍기의 건의를 받아들여…</td><td>노비안검법</td><td>과거제</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>도움이 필요한 학생</h3>
+    <p>없습니다. 새 한국사 문제는 상식 저조만 풀어서 반 정답률과 비교할 수 없습니다.</p>
+
+    <h3>아직 안 해 본 영역</h3>
+    <ul class="compact">
+      <li>한국사: 0명</li>
+      <li>과학·지리·일반상식: 각 1명</li>
+      <li>스피드 모드 기록 없음: 1명</li>
+    </ul>
+  </section>
+
+  <section id="compare" aria-labelledby="h-compare">
+    <h2 id="h-compare">상하위 비교 <span class="note">(3명 전원, 반 기준은 전체 학생)</span></h2>
+    <h3>종합 비교</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th class="num">상식 왕</th><th class="num">퀴즈 왕</th><th class="num">상식 저조</th></tr></thead>
+        <tbody>
+          <tr><td>기록 수</td><td class="num">1</td><td class="num"><b>4</b></td><td class="num">1</td></tr>
+          <tr><td>평균 득점률</td><td class="num"><b>100%</b></td><td class="num">96.5%</td><td class="num">39.2%</td></tr>
+          <tr><td>최고 득점률</td><td class="num"><b>100%</b></td><td class="num"><b>100%</b></td><td class="num">39.2%</td></tr>
+          <tr><td>정답률</td><td class="num"><b>100%</b></td><td class="num">98.9%</td><td class="num">50.0%</td></tr>
+          <tr><td>힌트 사용률</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+          <tr><td>평균 응답</td><td class="num"><b>2.4초</b></td><td class="num">2.8초</td><td class="num">5.5초</td></tr>
+          <tr><td>시간 초과</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>마지막 기록</td><td class="num">14:31</td><td class="num">14:00</td><td class="num">15:09</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>순위표별 최고 득점률</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th class="num">상식 왕</th><th class="num">퀴즈 왕</th><th class="num">상식 저조</th></tr></thead>
+        <tbody>
+          <tr><td>전체 도전</td><td class="num">—</td><td class="num"><b>100%</b></td><td class="num">—</td></tr>
+          <tr><td>카테고리·한국사</td><td class="num">—</td><td class="num"><b>86.2%</b></td><td class="num">39.2%</td></tr>
+          <tr><td>카테고리·과학/지리/일반상식</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+          <tr><td>스피드</td><td class="num"><b>100%</b></td><td class="num"><b>100%</b></td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>카테고리별 정답률</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th class="num">상식 왕</th><th class="num">퀴즈 왕</th><th class="num">상식 저조</th><th class="num">반</th></tr></thead>
+        <tbody>
+          <tr><td>한국사</td><td class="num">100%*</td><td class="num"><b>96.7%</b></td><td class="num">50.0%</td><td class="num">86.4%</td></tr>
+          <tr><td>과학</td><td class="num">100%*</td><td class="num"><b>100%</b></td><td class="num">—</td><td class="num">100%</td></tr>
+          <tr><td>지리</td><td class="num">100%*</td><td class="num"><b>100%</b></td><td class="num">—</td><td class="num">100%</td></tr>
+          <tr><td>일반상식</td><td class="num">100%*</td><td class="num"><b>100%</b></td><td class="num">—</td><td class="num">100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">* 표본 부족(답안 10개 미만)</p>
+
+    <h3>같은 문제 비교</h3>
+    <p>두 명 이상이 함께 답한 문제는 16개이고, 모두 전원 정답입니다. 학생 사이에 결과가 갈린 문제는 없습니다.</p>
+
+    <h3>강점과 보완점</h3>
+    <ul class="compact">
+      <li>상식 왕: 모든 카테고리가 표본 부족이라 판정하지 않았습니다.</li>
+      <li>퀴즈 왕: 강점은 한국사(+10.3%p)이고, 보완점은 없습니다.</li>
+      <li>상식 저조: 강점은 없고, 보완점은 한국사(−36.4%p)입니다.</li>
+    </ul>
+    <p class="note">해석 주의: 기록 수 차이가 4배(4개 대 1개)이고 기록이 1개뿐인 학생이 2명이라 비교가 공정하지 않을 수 있습니다. 퀴즈 왕의 한국사 기록은 문제 교체 전(14:00)이라 상식 저조와 같은 문제가 아닙니다.</p>
+  </section>
+
+  <section id="students" aria-labelledby="h-students">
+    <h2 id="h-students">학생별 요약</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>닉네임</th><th class="num">기록</th><th class="num">평균 득점률</th><th>추이</th><th>강한 카테고리</th><th>약한 카테고리</th><th>지도 제안</th></tr></thead>
+        <tbody>
+          <tr><td>상식 왕</td><td class="num">1</td><td class="num">100%</td><td>= (기록 1개)</td><td>— (표본 부족)</td><td>— (표본 부족)</td><td class="wrap">스피드 기록뿐이니 카테고리별 모드로 기록을 쌓기</td></tr>
+          <tr><td>퀴즈 왕</td><td class="num">4</td><td class="num">96.5%</td><td>▼ −13.8%p (100→86.2)</td><td>과학 100% (지리·일반상식도 100%)</td><td>한국사 96.7%</td><td class="wrap">새로 바뀐 한국사 문제로 카테고리 모드를 다시 풀기</td></tr>
+          <tr><td>상식 저조</td><td class="num">1</td><td class="num">39.2%</td><td>= (기록 1개)</td><td>—</td><td>한국사 50.0%</td><td class="wrap">한국사 오답 5문제 복습(고려 제도, 개항기), 다른 카테고리도 시도하기</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="suggest" aria-labelledby="h-suggest">
+    <h2 id="h-suggest">수업 제안</h2>
+    <ol class="compact">
+      <li><b>한국사가 유일한 약점입니다.</b> 반 정답률이 86.4%이고, 새 문제는 50%(답안 10개)입니다. 새 한국사 문제를 반 전체 카테고리 과제로 내 주세요.</li>
+      <li><b>시대 혼동이 보입니다.</b> 삼별초→별무반, 강화도 조약→을사늑약, 과거제→노비안검법으로 골랐습니다. 고려 제도와 개항기 조약을 연표로 정리하면 좋겠습니다(학생 1명의 결과라 근거가 약함).</li>
+      <li><b>안 해 본 영역을 채워 주세요.</b> 과학·지리·일반상식을 안 해 본 학생이 각 1명, 스피드 모드를 안 해 본 학생이 1명입니다.</li>
+      <li><b>HARD 정답률이 90%입니다.</b> 난이도 조정 여부는 기록을 더 모은 뒤 판단하세요.</li>
+      <li><b>표본이 작습니다.</b> 학생 3명, 기록 6개로는 결론을 내기 어렵습니다. 학생들이 <code>3반-이름</code>처럼 반 접두어를 붙여 등록하게 하면 반별로 볼 수 있습니다.</li>
+    </ol>
+  </section>
+
+  <section id="steps" aria-labelledby="h-steps">
+    <h2 id="h-steps">단계별 실행 결과</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>단계</th><th>결과</th><th>핵심 수치</th></tr></thead>
+        <tbody>
+          <tr><td>1. 명단</td><td>완료</td><td class="wrap">3명, 6기록, 평균 득점률 78.6%(중앙값 96.5%)</td></tr>
+          <tr><td>2. 취약 영역</td><td>완료</td><td class="wrap">한국사 50%(새 문제), 교체 전 답안 34개 제외, 도움 필요 0명</td></tr>
+          <tr><td>3. 상하위 비교</td><td>완료</td><td class="wrap">3명 전원, 공통 16문제, 갈린 문제 0개</td></tr>
+          <tr><td>4. 학생별 요약</td><td>완료</td><td class="wrap">3명, ⚑ 0명</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">이 페이지는 2026-10-30 15:16 시점의 스냅숏입니다. 새 기록을 반영하려면 Claude Code에서 <code>/teacher-report</code>를 다시 실행하세요. 개인 상세는 <code>/teacher-student &lt;닉네임&gt;</code>, 문제 검증은 <code>/quiz-check 한국사</code>.</p>
+  </section>
+</main>
+<script>
+  document.querySelectorAll(".toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view;
+      btn.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== view; });
+    });
+  });
+</script>
+</body>
+</html>

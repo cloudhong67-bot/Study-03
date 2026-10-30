@@ -2,6 +2,7 @@
 import type { Score } from "@prisma/client";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { AppError } from "@/lib/errors";
+import { periodStart } from "@/lib/leaderboard-period";
 import { prisma } from "@/lib/prisma";
 import { getCategoryBySlug } from "@/lib/quiz/categories";
 import { ANSWER_RECORD_SELECT, assertNotExpired, sessionNotFound, summarizeSession } from "@/lib/quiz/sessions";
@@ -41,6 +42,8 @@ export async function submitScore(sessionId: string, input: SubmitScoreInput) {
         totalCount: summary.totalCount,
         mode: session.mode,
         categoryId: session.categoryId,
+        // 주간·일일 순위표가 앱 시계로 기간을 자르므로, 등록 시각도 DB 기본값이 아닌 앱 시계로 쓴다.
+        createdAt: new Date(),
       },
     });
   } catch (error) {
@@ -79,11 +82,17 @@ async function rankOf(score: Score): Promise<number> {
   return ahead + 1;
 }
 
-export async function getLeaderboard(query: LeaderboardQuery) {
+/** 주간·일일 순위표는 기간 안에 등록한 기록만 모아 1위부터 다시 매긴다. */
+export async function getLeaderboard(query: LeaderboardQuery, now: Date = new Date()) {
   const category = query.category ? await getCategoryBySlug(query.category) : null;
+  const since = periodStart(query.period, now);
 
   const scores = await prisma.score.findMany({
-    where: { mode: query.mode, categoryId: category?.id ?? null },
+    where: {
+      mode: query.mode,
+      categoryId: category?.id ?? null,
+      ...(since ? { createdAt: { gte: since } } : {}),
+    },
     orderBy: [{ score: "desc" }, { createdAt: "asc" }, { id: "asc" }],
     take: query.limit,
     select: { username: true, score: true, maxScore: true, createdAt: true },

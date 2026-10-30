@@ -36,6 +36,14 @@ describe("leaderboardHref", () => {
     expect(leaderboardHref({ mode: "ALL" })).toBe("/leaderboard");
   });
 
+  it("기간은 주간·일일만 쿼리로 붙이고, 전체 기간(기본값)은 생략한다", () => {
+    expect(leaderboardHref({ period: "weekly" })).toBe("/leaderboard?period=weekly");
+    expect(leaderboardHref({ categorySlug: "science", period: "daily", limit: 50 })).toBe(
+      "/leaderboard?mode=CATEGORY&category=science&period=daily&limit=50",
+    );
+    expect(leaderboardHref({ mode: "SPEED", period: "all" })).toBe("/leaderboard?mode=SPEED");
+  });
+
   it("강조 순위 0은 의미가 없으므로 붙이지 않는다", () => {
     expect(leaderboardHref({ highlight: 0 })).toBe("/leaderboard");
   });

@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { categoryIcon } from "@/components/category-icon";
 import { SPEED_QUESTION_COUNT, SPEED_TIME_LIMIT_MS } from "@/lib/limits";
-import { leaderboardHref, quizHref } from "@/lib/routes";
+import { leaderboardHref, quizHref, RECORDS_HREF } from "@/lib/routes";
 
 interface MainMenuProps {
   categories: { slug: string; name: string; questionCount: number }[];
@@ -59,9 +59,14 @@ export function MainMenu({ categories, totalQuestions }: MainMenuProps) {
         </ul>
       )}
 
-      <Link href={leaderboardHref()} className={secondaryButton}>
-        🏆 순위 보기
-      </Link>
+      <div className="grid grid-cols-2 gap-3">
+        <Link href={leaderboardHref()} className={secondaryButton}>
+          🏆 순위 보기
+        </Link>
+        <Link href={RECORDS_HREF} className={secondaryButton}>
+          📊 내 기록
+        </Link>
+      </div>
     </div>
   );
 }

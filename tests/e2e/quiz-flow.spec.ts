@@ -44,10 +44,39 @@ test("핵심 흐름: 메인 → 카테고리 퀴즈 10문제 → 결과 → 닉�
   await expect(myRow).toContainText(nickname);
   await expect(myRow).toContainText(`${score}/${SCIENCE_MAX_SCORE}`);
 
+  // 방금 등록한 기록은 주간·일일 순위표에도 있다. 등록 순위는 전체 기간 기준이라 기간 순위표에서는 강조하지 않는다.
+  const periods = page.getByRole("group", { name: "순위표 기간" });
+  for (const [label, query] of [["주간", "weekly"], ["일일", "daily"]]) {
+    await periods.getByRole("link", { name: label }).click();
+    await expect(page).toHaveURL(new RegExp(`mode=CATEGORY&category=science&period=${query}$`));
+    await expect(page.getByRole("heading", { name: `과학 ${label} Top 10` })).toBeVisible();
+    await expect(page.getByRole("row", { name: new RegExp(nickname) })).toBeVisible();
+    await expect(page.locator("tr[aria-current='true']")).toHaveCount(0);
+  }
+
   // 5. 결과 화면을 다시 열면 중복 등록 대신 "이미 등록" 상태가 보인다.
   await page.goto(resultUrl);
   await expect(page.getByText("이미 순위표에 등록한 기록입니다")).toBeVisible();
   await expect(page.getByRole("button", { name: "점수 등록" })).toHaveCount(0);
+
+  // 6. 결과는 이 브라우저의 내 기록에 자동 저장되고, 결과 화면을 여러 번 열어도 한 번만 센다.
+  await page.getByRole("link", { name: "📊 내 기록" }).click();
+  await expect(page).toHaveURL(/\/records$/);
+  const totals = page.getByRole("region", { name: "전체 통계" });
+  await expect(totals).toContainText("1판");
+  await expect(totals).toContainText(`${correctCount} / 10`);
+  await expect(page.getByRole("table")).toContainText("카테고리별");
+  await expect(page.getByRole("meter", { name: "과학 정답률" })).toHaveAttribute("aria-valuenow", String(correctCount * 10));
+  const recent = page.getByRole("listitem").filter({ hasText: `${correctCount}/10 정답` });
+  await expect(recent).toHaveCount(1);
+  await expect(recent).toContainText(`${score}/${SCIENCE_MAX_SCORE}`);
+
+  // 기록 지우기는 한 번 더 확인한 뒤에 지운다.
+  await page.getByRole("button", { name: /기록 지우기/ }).click();
+  await page.getByRole("button", { name: "모두 지우기" }).click();
+  await expect(page.getByText("아직 저장된 기록이 없어요")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("아직 저장된 기록이 없어요")).toBeVisible();
 });
 
 test("전체 모드 시작과 키보드 답안 선택", async ({ page }) => {
@@ -150,6 +179,19 @@ test("순위표: 카테고리 탭·Top 50 전환과 재도전", async ({ page })
   await page.getByRole("link", { name: "Top 50" }).click();
   await expect(page).toHaveURL(/category=geography&limit=50/);
   await expect(page.getByRole("heading", { name: "지리 Top 50" })).toBeVisible();
+
+  // 기간을 바꿔도 카테고리·표시 개수는 유지되고, 탭을 옮겨도 기간이 유지된다.
+  const periods = page.getByRole("group", { name: "순위표 기간" });
+  await periods.getByRole("link", { name: "주간" }).click();
+  await expect(page).toHaveURL(/category=geography&period=weekly&limit=50$/);
+  await expect(page.getByRole("heading", { name: "지리 주간 Top 50" })).toBeVisible();
+  await expect(periods.getByRole("link", { name: "주간" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "과학", exact: true })).toHaveAttribute(
+    "href",
+    "/leaderboard?mode=CATEGORY&category=science&period=weekly&limit=50",
+  );
+  await periods.getByRole("link", { name: "전체 기간" }).click();
+  await expect(page).toHaveURL(/category=geography&limit=50$/);
 
   await page.getByRole("link", { name: /지리 재도전/ }).click();
   await expect(page).toHaveURL(/\/quiz\?category=geography$/);

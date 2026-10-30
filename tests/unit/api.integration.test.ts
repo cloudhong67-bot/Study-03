@@ -486,8 +486,72 @@ describe("GET /api/leaderboard", () => {
     expect(top50).toHaveLength(12);
   });
 
-  it.each(["?limit=20", "?mode=CATEGORY", "?mode=WEEKLY"])("잘못된 쿼리 %s → 400", async (query) => {
-    expect((await leaderboard(query)).status).toBe(400);
+  it.each(["?limit=20", "?mode=CATEGORY", "?mode=WEEKLY", "?period=monthly", "?period=WEEKLY", "?period="])(
+    "잘못된 쿼리 %s → 400",
+    async (query) => {
+      expect((await leaderboard(query)).status).toBe(400);
+    },
+  );
+
+  it("주간·일일 순위표는 한국 시간 이번 주 월요일·오늘 0시부터의 기록만 1위부터 다시 매긴다", async () => {
+    vi.setSystemTime(new Date("2026-10-30T03:00:00Z")); // 금요일 12:00 (한국 시간)
+    const rows: [string, number, string][] = [
+      ["지난주", 90, "2026-10-25T14:59:59.999Z"], // 일요일 23:59:59.999 → 이번 주 아님
+      ["월요일0시", 50, "2026-10-25T15:00:00.000Z"], // 월요일 00:00 → 이번 주 첫 순간
+      ["어제", 70, "2026-10-29T14:59:59.999Z"], // 목요일 23:59:59.999 → 오늘 아님
+      ["오늘0시", 30, "2026-10-29T15:00:00.000Z"], // 금요일 00:00 → 오늘 첫 순간
+    ];
+    for (const [username, score, createdAt] of rows) {
+      const session = await prisma.quizSession.create({ data: { mode: "ALL", questionIds: [] } });
+      await prisma.score.create({
+        data: {
+          sessionId: session.id,
+          username,
+          score,
+          maxScore: 100,
+          correctCount: 0,
+          totalCount: 40,
+          mode: "ALL",
+          createdAt: new Date(createdAt),
+        },
+      });
+    }
+    const board = async (query: string) =>
+      (await leaderboard(query)).body.map(({ rank, username }) => [rank, username]);
+
+    expect(await board("")).toEqual([
+      [1, "지난주"],
+      [2, "어제"],
+      [3, "월요일0시"],
+      [4, "오늘0시"],
+    ]);
+    expect(await board("?period=all")).toEqual(await board(""));
+    expect(await board("?period=weekly")).toEqual([
+      [1, "어제"],
+      [2, "월요일0시"],
+      [3, "오늘0시"],
+    ]);
+    expect(await board("?period=daily")).toEqual([[1, "오늘0시"]]);
+    // 다른 모드의 기간 순위표와 섞이지 않는다.
+    expect(await board("?mode=SPEED&period=daily")).toEqual([]);
+  });
+
+  it("방금 등록한 점수는 일일 순위표에 바로 나오고, 다음 날에는 빠지지만 전체 순위표에는 남는다", async () => {
+    const session = await playSession({ mode: "CATEGORY", categorySlug: "science" }, 10);
+    expect((await submit(session.sessionId, "오늘의일등")).status).toBe(201);
+    // 등록 시각은 DB 기본값이 아니라 앱 시계(가짜 Date)로 기록된다.
+    const stored = await prisma.score.findUniqueOrThrow({ where: { sessionId: session.sessionId } });
+    expect(stored.createdAt.getTime()).toBe(Date.now());
+
+    const query = "?mode=CATEGORY&category=science";
+    expect((await leaderboard(`${query}&period=daily`)).body.map((e) => e.username)).toEqual(["오늘의일등"]);
+    expect((await leaderboard(`${query}&period=weekly`)).body.map((e) => e.username)).toEqual(["오늘의일등"]);
+
+    advanceClock(24 * 60 * 60 * 1000);
+    expect((await leaderboard(`${query}&period=daily`)).body).toEqual([]);
+    advanceClock(6 * 24 * 60 * 60 * 1000);
+    expect((await leaderboard(`${query}&period=weekly`)).body).toEqual([]);
+    expect((await leaderboard(query)).body.map((e) => e.username)).toEqual(["오늘의일등"]);
   });
 
   it("존재하지 않는 카테고리 → 404", async () => {

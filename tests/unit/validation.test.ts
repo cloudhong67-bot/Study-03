@@ -104,8 +104,16 @@ describe("submitScoreSchema (닉네임)", () => {
 });
 
 describe("leaderboardQuerySchema", () => {
-  it("기본값은 ALL 모드, limit 10이다", () => {
-    expect(leaderboardQuerySchema.parse({})).toEqual({ mode: "ALL", category: undefined, limit: 10 });
+  it("기본값은 ALL 모드, 전체 기간, limit 10이다", () => {
+    expect(leaderboardQuerySchema.parse({})).toEqual({ mode: "ALL", category: undefined, period: "all", limit: 10 });
+  });
+
+  it("period는 all·weekly·daily만 허용한다 (대소문자 구분, 빈 값 거부)", () => {
+    expect(leaderboardQuerySchema.parse({ period: "weekly" }).period).toBe("weekly");
+    expect(leaderboardQuerySchema.parse({ period: "daily" }).period).toBe("daily");
+    for (const period of ["monthly", "WEEKLY", "", " daily", "constructor", "__proto__"]) {
+      expect(leaderboardQuerySchema.safeParse({ period }).success).toBe(false);
+    }
   });
 
   it("limit은 10 또는 50만 허용한다", () => {
@@ -125,6 +133,7 @@ describe("leaderboardQuerySchema", () => {
     expect(leaderboardQuerySchema.parse({ mode: "SPEED", category: "science" })).toEqual({
       mode: "SPEED",
       category: undefined,
+      period: "all",
       limit: 10,
     });
   });

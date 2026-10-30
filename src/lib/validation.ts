@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from "@/lib/limits";
+import { LEADERBOARD_PERIODS } from "@/lib/routes";
 
 export const LEADERBOARD_LIMITS = ["10", "50"] as const;
 
@@ -61,6 +62,7 @@ export const leaderboardQuerySchema = z
   .object({
     mode: quizModeSchema.default("ALL"),
     category: z.string().trim().min(1).optional(),
+    period: z.enum(LEADERBOARD_PERIODS).default("all"),
     limit: z.enum(LEADERBOARD_LIMITS).default("10").transform(Number),
   })
   .refine((q) => q.mode !== "CATEGORY" || q.category !== undefined, {

@@ -77,7 +77,7 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
     - `prisma.ts`: client and `checkDatabase`
     - `rate-limit.ts` and `client-ip.ts`
     - `api.ts`: HTTP mapping and body reading
-    - `async.ts`, `shuffle.ts`, `scoring.ts`, `hint.ts`, `limits.ts`, `validation.ts`
+    - `async.ts`, `shuffle.ts`, `scoring.ts`, `hint.ts`, `limits.ts`, `validation.ts`, `leaderboard-period.ts`
   - Infrastructure must not import the domain. The only exceptions are `api.ts` reusing `sessionNotFound` and `maintenance.ts` calling `cleanupExpiredSessions`.
 - **Route handlers** (`src/app/api/**/route.ts`) stay thin: check the rate limit if needed, `parseJson(request, schema)` / `readSessionId(context)`, call one domain function, and wrap it all in `handle()` from `src/lib/api.ts`.
   - `handle()` turns `ZodError` into 400, `AppError` into its code (`BAD_REQUEST` 400, `NOT_FOUND` 404, `REQUEST_TIMEOUT` 408, `CONFLICT` 409, `PAYLOAD_TOO_LARGE` 413, `TOO_MANY_REQUESTS` 429), and transient DB errors into 503. Anything else becomes a logged 500.
@@ -92,7 +92,7 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
 
 - **Data flow:**
   - Server-rendered pages (`/`, `/leaderboard`, `/result/[sessionId]`) call `src/lib/quiz/*` functions directly, not their own `/api/*` routes, and they're `force-dynamic` or dynamic through `searchParams`. Run independent loads in parallel (`Promise.all`).
-  - Only interactive parts are client components, colocated with their page: `MainMenu.tsx`, `quiz/QuizRunner.tsx`, and `result/[sessionId]/ScoreSubmitForm.tsx`. They talk to the server through `postJson` (`src/lib/http-client.ts`) to the `/api/*` routes.
+  - Only interactive parts are client components, colocated with their page: `MainMenu.tsx`, `quiz/QuizRunner.tsx`, `result/[sessionId]/ScoreSubmitForm.tsx`, `result/[sessionId]/SaveLocalResult.tsx`, and `records/RecordsView.tsx`. They talk to the server through `postJson` (`src/lib/http-client.ts`) to the `/api/*` routes.
   - Use `src/lib/page-helpers.ts` in pages: `orNotFound(promise)` maps domain `NOT_FOUND` to `notFound()`, and `flattenSearchParams` / `firstParam` normalize query params.
 - **API types:** never hand-write response types on the client. Derive them on the server (`CreatedSession`, `AnswerFeedback`, `QuizResult` in `quiz/sessions.ts`; `SubmittedScore`, `LeaderboardEntry` in `quiz/scores.ts`) and use `import type` on the client.
 - **Status screens:** error, 404, and "couldn't start" screens use `src/components/StatusMessage.tsx` (icon, title, message, action buttons). Don't hand-build new ones.
@@ -109,14 +109,20 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
   - `npm run lint` fails on these violations through `lint:hooks`; this was verified with a deliberately violating file.
   - After the Next 16 upgrade the default lint includes these rules. Delete `eslint.hooks.config.mjs`, the `lint:hooks` script, and the `eslint-plugin-react-hooks-v7` alias then, and set `lint` back to `eslint`.
 - **Quiz session:** the session is created in an effect with a `useRef` guard, so StrictMode's double effect doesn't create two sessions. A page refresh starts a new session, because there's no API to resume one.
-- **URLs:** build them with `quizHref({ mode, categorySlug })` and `leaderboardHref({ mode, categorySlug, … })` in `src/lib/routes.ts` (`/quiz?mode=all|speed`, `/quiz?category=<slug>`). Leaderboard `highlight=<rank>` marks the row that was just submitted. `routes.ts` also has the client-safe `QuizMode` type.
+- **URLs:** build them with `quizHref({ mode, categorySlug })` and `leaderboardHref({ mode, categorySlug, period, … })` in `src/lib/routes.ts` (`/quiz?mode=all|speed`, `/quiz?category=<slug>`), and use `RECORDS_HREF` for `/records`. Leaderboard `highlight=<rank>` marks the row that was just submitted; the submit rank is all-time, so the page ignores `highlight` on the weekly and daily boards. `routes.ts` also has the client-safe `QuizMode` and `LeaderboardPeriod` types and `LEADERBOARD_PERIODS`.
+- **Leaderboard periods:** `period=all|weekly|daily` (default `all`). `periodStart()` in `src/lib/leaderboard-period.ts` cuts on the Korean calendar (UTC+9, no DST): today 00:00 KST, or this week's Monday 00:00 KST. The boards re-rank from 1 inside the period. `getLeaderboard(query, now)` takes an injectable `now`.
+- **Local history (내 기록):** `LocalDataManager` in `src/lib/data-manager.ts` keeps the last `MAX_GAME_RECORDS` (100) finished games and cumulative stats (per mode; per category: correct/total across all modes, games and best score in category mode only) in localStorage under `trivia:history`. Stats keep counting after old games drop out of the list.
+  - It's display-only. The server never receives it, and the leaderboard never uses it.
+  - `SaveLocalResult` records the result in an effect when a completed result page opens. `recordGame` dedupes by `sessionId`, so refreshes and StrictMode's double effect count once. A session that has already dropped out of the 100 could be counted again; that's an accepted limit.
+  - Treat the stored value as untrusted: `parseHistory` validates every field, skips bad or duplicate games, and rebuilds the stats from the remaining games if the stored stats are invalid. Category stats are an array, not an object keyed by name, so names like `__proto__` are safe.
+  - The UI reads it through `useLocalHistory()` (`src/lib/use-local-history.ts`, `useSyncExternalStore`, server snapshot `null` meaning "not loaded yet"). Inject the storage and clock into `LocalDataManager` in tests.
 - **Speed timer:** `src/components/Countdown.tsx` only displays the time; it reads the clock in effects, never during render. The timeout itself is the deadline effect in `use-quiz-session.ts`, which sends `selectedIndex: null`.
 - **Styling:** Tailwind v4.
   - Theme tokens (`bg-surface`, `text-muted`, `border-border`, …) and the `shake`, `pop`, and `rise` animations live in `src/app/globals.css`. Use the animations only with the `motion-safe:` prefix.
   - Shared button classes are in `src/components/button-styles.ts`.
   - Dark mode follows `prefers-color-scheme`, so pair each color with a `dark:` variant.
   - The font is the system Korean stack; there's no web font.
-- **Sound:** effects are synthesized with Web Audio in `src/lib/sound.ts`. There are no audio files. The mute preference is stored in `localStorage` under `trivia:sound`.
+- **Sound:** effects are synthesized with Web Audio in `src/lib/sound.ts`. There are no audio files. The mute preference is stored in `localStorage` under `trivia:sound`; local history uses `trivia:history`.
 - **React keys:** sibling elements must never share a `key`. A shared key between `QuestionCard` and `FeedbackPanel` once left stale question cards in the production DOM.
 
 ## Security measures (keep these intact)
@@ -140,7 +146,7 @@ The spec is `PRD.md` (in Korean). Sections 1–5 are the product requirements. S
 - **Answer pacing:**
   - `submitAnswer` locks the session row (`SELECT … FOR UPDATE`) and rejects an answer that comes less than `MIN_ANSWER_INTERVAL_MS` (in `limits.ts`, shared with the client) after the previous answer or the session start.
   - `QuizRunner` sleeps out the remainder before sending, so real players never see the error.
-  - `startedAt`, `viewedAt`, and `answeredAt` are written from the app clock, not DB defaults. Keep it that way, because the interval, TTL, time-bonus, and speed-limit checks compare JS times.
+  - `startedAt`, `viewedAt`, `answeredAt`, and `scores.createdAt` are written from the app clock, not DB defaults. Keep it that way, because the interval, TTL, time-bonus, speed-limit, and leaderboard-period checks compare JS times.
 - **Server-side timing:** the time bonus and the speed-mode limit use `elapsed_ms` = answer arrival − `session_question_views.viewed_at`, never a client-reported time. Questions can only be opened in order (409 otherwise) and only opened questions can be answered (409), so answers are always in question order. A speed answer later than `SPEED_TIME_LIMIT_MS` + `SPEED_DEADLINE_GRACE_MS` (2s for network latency) is stored as `timed_out`, wrong even if correct.
 - **Expiry and cleanup:**
   - Unscored sessions expire after `SESSION_TTL_MS` (24h); answer and submit on an expired session return 404.

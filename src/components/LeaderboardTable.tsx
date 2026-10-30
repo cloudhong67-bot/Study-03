@@ -15,13 +15,15 @@ interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
   /** 방금 등록한 기록의 순위 (강조 표시) */
   highlightRank?: number;
+  /** 기록이 없을 때 보여 줄 문구 */
+  emptyMessage?: string;
 }
 
-export function LeaderboardTable({ entries, highlightRank }: LeaderboardTableProps) {
+export function LeaderboardTable({ entries, highlightRank, emptyMessage }: LeaderboardTableProps) {
   if (entries.length === 0) {
     return (
-      <p className="rounded-3xl border border-dashed border-border bg-surface p-8 text-center text-muted">
-        아직 등록된 기록이 없어요. 첫 번째 주인공이 되어 보세요!
+      <p className="break-keep rounded-3xl border border-dashed border-border bg-surface p-8 text-center text-muted">
+        {emptyMessage ?? "아직 등록된 기록이 없어요. 첫 번째 주인공이 되어 보세요!"}
       </p>
     );
   }
